@@ -1,0 +1,4 @@
+[flake8]
+exclude = operaton.py
+max-line-length = 120
+

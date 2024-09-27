@@ -1,0 +1,54 @@
+[project]
+name = "operaton-tasks"
+version = "0.1.0"
+description = ""
+readme = "README.md"
+authors = [
+    {name = "Asko Soukka", email = "asko.soukka@iki.fi"},
+]
+license = {text = "Apache Software License" }
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+]
+requires-python = ">= 3.9"
+dependencies =[
+    "aiohttp>=3.11.9",
+    "fastapi>=0.115.6",
+    "pydantic>=2.10.3",
+    "pydantic-settings>=2.6.1",
+    "starlette>=0.41.3",
+]
+
+[project.scripts]
+operaton-tasks = "operaton.tasks.main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+cli = [
+    "uvicorn>=0.32.1",
+    "typer>=0.15.1",
+]
+dev = [
+    "black>=24.10.0",
+    "datamodel-code-generator>=0.26.3",
+    "flake8>=7.1.1",
+    "isort>=5.13.2",
+    "mypy>=1.13.0",
+    "pytest>=8.3.4",
+    "pytest-cov>=6.0.0",
+]
+
+[tool.isort]
+force_alphabetical_sort_within_sections = true
+force_single_line = true
+from_first = true
+line_length = 200
+lines_after_imports = 2
+lines_between_types = 0
+no_sections = true
