@@ -45,8 +45,10 @@ dev = [
     "flake8>=7.1.1",
     "isort>=5.13.2",
     "mypy>=1.13.0",
-    "pytest>=8.3.4",
     "pytest-cov>=6.0.0",
+    "pytest>=8.3.4",
+    "typer>=0.15.1",
+    "uvicorn>=0.32.1",
 ]
 
 [tool.isort]
