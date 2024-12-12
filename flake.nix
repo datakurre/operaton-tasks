@@ -156,7 +156,7 @@
             })
           ];
         };
-        devShells.uv = pkgs.mkShell {
+        devShells.impure = pkgs.mkShell {
           packages = [
             python
             uv
