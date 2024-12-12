@@ -1,11 +1,19 @@
-from operaton.tasks import task
+# /// script
+# dependencies = [
+#   "operaton-tasks@https://github.com/datakurre/operaton-tasks.git",
+#   "uvicorn",
+#   "typer",
+# ]
+# ///
 from operaton.tasks.types import LockedExternalTaskDto
 from operaton.tasks.types import ExternalTaskComplete
 from operaton.tasks.types import CompleteExternalTaskDto
 from operaton.tasks.types import VariableValueDto
 from operaton.tasks.types import VariableValueType
 
-@task("hello-world", localVariables=True)
+import operaton.tasks
+
+@operaton.tasks.register("hello-world", localVariables=True)
 async def handler(task: LockedExternalTaskDto) -> ExternalTaskComplete:
     return ExternalTaskComplete(
         task=task,
@@ -16,3 +24,5 @@ async def handler(task: LockedExternalTaskDto) -> ExternalTaskComplete:
             },
         ),
     )
+
+operaton.tasks.serve()
