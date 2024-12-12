@@ -107,68 +107,64 @@
 
         # docs: https://pyproject-nix.github.io/uv2nix/usage/hello-world.html
         packages.default = pythonSet.mkVirtualEnv "${name}-env" workspace.deps.default;
-        devShells = {
-          default =
-            let
-              editableOverlay = workspace.mkEditablePyprojectOverlay {
-                root = "$REPO_ROOT";
-              };
-              editablePythonSet = pythonSet.overrideScope editableOverlay;
-              virtualenv = editablePythonSet.mkVirtualEnv "${name}-dev-env" workspace.deps.all;
-            in
-            inputs.devenv.lib.mkShell {
-              inherit inputs pkgs;
-              modules = [
-                (
-                  { pkgs, config, ... }:
-                  {
-                    packages = [
-                      jdk
-                      maven
-                      pkgs.entr
-                      uv
-                      virtualenv
-                    ];
-                    enterShell = ''
-                      # Undo dependency propagation by nixpkgs.
-                      unset PYTHONPATH
 
-                      # Don't create venv using uv
-                      export UV_NO_SYNC=1
-
-                      # Prevent uv from downloading managed Python's
-                      export UV_PYTHON_DOWNLOADS=never
-
-                      # Get repository root using git. This is expanded at runtime by the editable `.pth` machinery.
-                      export REPO_ROOT=$(git rev-parse --show-toplevel)
-                    '';
-                    processes.run.exec = "java -jar ${self.packages.${localSystem}.fixture}";
-                  }
-                )
-              ];
+        devShells.default =
+          let
+            editableOverlay = workspace.mkEditablePyprojectOverlay {
+              root = "$REPO_ROOT";
             };
-          mvn2nix = pkgs.mkShell {
-            packages = [
-              jdk
-              maven
-              (inputs.mvn2nix.defaultPackage.${localSystem}.override {
-                inherit jdk maven;
-              })
+            editablePythonSet = pythonSet.overrideScope editableOverlay;
+            virtualenv = editablePythonSet.mkVirtualEnv "${name}-dev-env" workspace.deps.all;
+          in
+          inputs.devenv.lib.mkShell {
+            inherit inputs pkgs;
+            modules = [
+              (
+                { pkgs, config, ... }:
+                {
+                  packages = [
+                    jdk
+                    maven
+                    pkgs.entr
+                    uv
+                    virtualenv
+                  ];
+                  enterShell = ''
+                    # Undo dependency propagation by nixpkgs.
+                    unset PYTHONPATH
+
+                    # Don't create venv using uv
+                    export UV_NO_SYNC=1
+
+                    # Prevent uv from downloading managed Python's
+                    export UV_PYTHON_DOWNLOADS=never
+
+                    # Get repository root using git. This is expanded at runtime by the editable `.pth` machinery.
+                    export REPO_ROOT=$(git rev-parse --show-toplevel)
+                  '';
+                  processes.run.exec = "java -jar ${self.packages.${localSystem}.fixture}";
+                }
+              )
             ];
           };
-          impure = pkgs.mkShell {
-            packages = [
-              python
-              uv
-            ];
-            shellHook = ''
-              unset PYTHONPATH
-              export UV_PYTHON_DOWNLOADS=never
-            '';
-          };
-          uv = pkgs.mkShell {
-            packages = [ uv ];
-          };
+        devShells.mvn2nix = pkgs.mkShell {
+          packages = [
+            jdk
+            maven
+            (inputs.mvn2nix.defaultPackage.${localSystem}.override {
+              inherit jdk maven;
+            })
+          ];
+        };
+        devShells.uv = pkgs.mkShell {
+          packages = [
+            python
+            uv
+          ];
+          shellHook = ''
+            unset PYTHONPATH
+            export UV_PYTHON_DOWNLOADS=never
+          '';
         };
         formatter = pkgs.nixfmt-rfc-style;
       }
