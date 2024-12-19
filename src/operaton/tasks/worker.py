@@ -112,7 +112,7 @@ async def extend_lock(
         await http.post(
             url,
             data=ExtendLockOnExternalTaskDto(
-                workerId=settings.ENGINE_REST_WORKER_ID,
+                workerId=settings.TASKS_WORKER_ID,
                 newDuration=settings.ENGINE_REST_LOCK_TTL_SECONDS * 1000,
             ).model_dump_json(),
         )
@@ -121,7 +121,7 @@ async def extend_lock(
 async def unlock_all(http: ClientSession) -> None:
     """Unlock all external tasks owned by this worker."""
     url = f"{settings.ENGINE_REST_BASE_URL}/external-task"
-    params = {"workerId": settings.ENGINE_REST_WORKER_ID}
+    params = {"workerId": settings.TASKS_WORKER_ID}
     response = await (await http.get(url, params=params)).json()
     for task in response:
         url = f"{settings.ENGINE_REST_BASE_URL}/external-task/{task['id']}/unlock"
@@ -159,7 +159,7 @@ def poll_topics(
 ) -> FetchExternalTasksDto:
     """Get external task query payload."""
     return FetchExternalTasksDto(
-        workerId=settings.ENGINE_REST_WORKER_ID,
+        workerId=settings.TASKS_WORKER_ID,
         maxTasks=tasks,
         asyncResponseTimeout=timeout,
         topics=[

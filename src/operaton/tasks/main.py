@@ -104,7 +104,7 @@ if HAS_CLI:
         settings.ENGINE_REST_TIMEOUT_SECONDS = timeout
         settings.ENGINE_REST_POLL_TTL_SECONDS = poll_ttl
         settings.ENGINE_REST_LOCK_TTL_SECONDS = lock_ttl
-        settings.ENGINE_REST_WORKER_ID = worker_id
+        settings.TASKS_WORKER_ID = worker_id
         settings.LOG_LEVEL = log_level
         settings.TASKS_MODULE = f"{module.absolute()}"
 
@@ -122,7 +122,7 @@ if HAS_CLI:
                         f"ENGINE_REST_TIMEOUT_SECONDS={timeout}\n",
                         f"ENGINE_REST_POLL_TTL_SECONDS={poll_ttl}\n",
                         f"ENGINE_REST_LOCK_TTL_SECONDS={lock_ttl}\n",
-                        f"ENGINE_REST_WORKER_ID={worker_id}\n",
+                        f"TASKS_WORKER_ID={worker_id}\n",
                         f"TASKS_MODULE={module}\n",
                         f"LOG_LEVEL={log_level}",
                     ]

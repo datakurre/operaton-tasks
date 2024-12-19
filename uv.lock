@@ -781,11 +781,13 @@ dependencies = [
     { name = "starlette" },
 ]
 
-[package.dev-dependencies]
+[package.optional-dependencies]
 cli = [
     { name = "typer" },
     { name = "uvicorn" },
 ]
+
+[package.dev-dependencies]
 dev = [
     { name = "black" },
     { name = "datamodel-code-generator" },
@@ -794,6 +796,8 @@ dev = [
     { name = "mypy" },
     { name = "pytest" },
     { name = "pytest-cov" },
+    { name = "typer" },
+    { name = "uvicorn" },
 ]
 
 [package.metadata]
@@ -803,13 +807,11 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.10.3" },
     { name = "pydantic-settings", specifier = ">=2.6.1" },
     { name = "starlette", specifier = ">=0.41.3" },
+    { name = "typer", marker = "extra == 'cli'", specifier = ">=0.15.1" },
+    { name = "uvicorn", marker = "extra == 'cli'", specifier = ">=0.32.1" },
 ]
 
 [package.metadata.requires-dev]
-cli = [
-    { name = "typer", specifier = ">=0.15.1" },
-    { name = "uvicorn", specifier = ">=0.32.1" },
-]
 dev = [
     { name = "black", specifier = ">=24.10.0" },
     { name = "datamodel-code-generator", specifier = ">=0.26.3" },
@@ -818,6 +820,8 @@ dev = [
     { name = "mypy", specifier = ">=1.13.0" },
     { name = "pytest", specifier = ">=8.3.4" },
     { name = "pytest-cov", specifier = ">=6.0.0" },
+    { name = "typer", specifier = ">=0.15.1" },
+    { name = "uvicorn", specifier = ">=0.32.1" },
 ]
 
 [[package]]
