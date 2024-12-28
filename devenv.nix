@@ -40,7 +40,7 @@
     export REPO_ROOT=$(git rev-parse --show-toplevel)
   '';
 
-  processes.gateway.exec = "make -s watch";
+  processes.example.exec = "make -s watch";
 
   enterTest = ''
     wait_for_port 8080 60
