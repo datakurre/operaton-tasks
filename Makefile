@@ -1,81 +1,90 @@
+help:
+	@grep -Eh '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}' | uniq
+
 INDEX_URL ?= https://pypi.python.org/simple
 INDEX_HOSTNAME ?= pypi.python.org
 
-SRCS := $(shell find src -name "*.py")
+export PYTHONPATH=$(PWD)/src
 
-NIX_OPTIONS ?= --accept-flake-config --no-pure-eval
+MODULE := operaton.tasks
+APP := operaton-tasks
 
-.PHONY: all
-all: build
+build:  ## Build application
+	devenv build outputs.python.app
 
-build: $(SRCS)
-	$(RM) build
-	nix build $(NIX_OPTIONS) -o build
+env:  ## Build and link the Python virtual environment
+	ln -s $(shell devenv build outputs.python.virtualenv) env
 
-.PHONY: clean
-clean:
-	rm -rf .cache env result
-
-.PHONY: coverage
-coverage: htmlcov
-
-.PHONY: venv
-venv:
-	nix build $(NIX_OPTIONS) .#env -o venv
-
-.PHONY: format
-format:
-	nix fmt flake.nix
-	black src tests
-	isort src tests
-
-.PHONY: check
-check: src/operaton/__init__.py
+check:  ## Run static analysis checks
 	black --check src tests
 	isort -c src tests
 	flake8 src
 	MYPYPATH=$(PWD)/stubs mypy --show-error-codes --strict src tests
 
-.PHONY: watch
-watch:
-	operaton-tasks --reload
+clean:  ## Remove build artifacts and temporary files
+	$(RM) -r env htmlcov
+	devenv gc
 
-.PHONY: watch_mypy
-watch_mypy: src/operaton/__init__.py
+devenv-up:  ## Start background services
+	devenv processes up -d
+
+devenv-attach:  ## Attach to background services monitor
+	devenv shell -- process-compose attach
+
+devenv-down:  ## Stop background services
+	devenv processes down
+
+devenv-test: ## Run all test and checks with background services
+	devenv test
+
+format:  ## Format the codebase
+	treefmt
+
+shell:  ## Start an interactive development shell
+	@devenv shell
+
+show:  ## Show build environment information
+	@devenv info
+
+test: check test-pytest  ## Run all tests and checks
+
+test-coverage: htmlcov  ## Generate HTML coverage reports
+
+test-pytest:  ## Run unit tests with pytest
+	pytest --cov=$(MODULE) tests
+
+watch: .env  ## Start the application in watch mode
+	$(APP) dummy.py -- --reload
+
+watch-mypy:  ## Continuously run mypy for type checks
 	find src tests -name "*.py"|MYPYPATH=$(PWD)/stubs entr mypy --show-error-codes --strict src tests
 
-.PHONY: watch_pytest
-watch_pytest:
+watch-pytest:  ## Continuously run pytest
 	find src tests -name "*.py"|entr pytest tests
 
-.PHONY: watch_tests
-watch_tests:
-	  $(MAKE) -j watch_mypy watch_pytest
-
-.PHONY: pytest
-pytest:
-	pytest --cov=operaton.tasks tests
-
-.PHONY: test
-test: check pytest
-
-env:
-	nix build $(NIX_OPTIONS) .#env -o env
-
-.PHONY: shell
-shell:
-	nix develop $(NIX_OPTIONS)
+watch-tests:  ## Continuously run all tests
+	  $(MAKE) -j watch-mypy watch-pytest
 
 ###
-
-nix-%:
-	nix develop $(NIX_OPTIONS) --command $(MAKE) $*
 
 .coverage: test
 
 htmlcov: .coverage
 	coverage html
 
-# error: Skipping analyzing "operaton.tasks"
-src/operaton/__init__.py:
-	touch $@
+define _env_script
+cat << EOF > .env
+ENGINE_REST_BASE_URL="http://localhost:8080/engine-rest"
+ENGINE_REST_AUTHORIZATION="Basic ZGVtbzpkZW1v"
+EOF
+endef
+export env_script = $(value _env_script)
+.env: ; @ eval "$$env_script"
+
+devenv-%:  ## Run command in devenv shell
+	devenv shell -- $(MAKE) $*
+
+nix-%:  ## Run command in devenv shell
+	devenv shell -- $(MAKE) $*
+
+FORCE:

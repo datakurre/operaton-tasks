@@ -1,7 +1,8 @@
-{ buildMavenRepositoryFromLockFile
-, jdk
-, maven
-, stdenv
+{
+  buildMavenRepositoryFromLockFile,
+  jdk,
+  maven,
+  stdenv,
 }:
 let
   mavenRepository = buildMavenRepositoryFromLockFile {
