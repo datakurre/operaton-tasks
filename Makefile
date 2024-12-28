@@ -22,8 +22,8 @@ check:  ## Run static analysis checks
 	MYPYPATH=$(PWD)/stubs mypy --show-error-codes --strict src tests
 
 clean:  ## Remove build artifacts and temporary files
-	$(RM) -r env htmlcov
 	devenv gc
+	$(RM) -r env htmlcov .devenv
 
 devenv-up:  ## Start background services
 	devenv processes up -d
@@ -54,7 +54,7 @@ test-pytest:  ## Run unit tests with pytest
 	pytest --cov=$(MODULE) tests
 
 watch: .env  ## Start the application in watch mode
-	$(APP) dummy.py -- --reload
+	$(APP) heartbeat.py -- --reload
 
 watch-mypy:  ## Continuously run mypy for type checks
 	find src tests -name "*.py"|MYPYPATH=$(PWD)/stubs entr mypy --show-error-codes --strict src tests

@@ -34,10 +34,10 @@ class State:
 state = State()
 
 
-@task(topic="operaton.tasks.heartbeat")
+@task(topic=settings.TASKS_HEARTBEAT_TOPIC)
 async def handler(task: LockedExternalTaskDto) -> ExternalTaskComplete:
     """Update health check timestamp."""
-    state.timestamp = datetime.datetime.utcnow().isoformat()
+    state.timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
     return ExternalTaskComplete(
         task=task,
         response=CompleteExternalTaskDto(
@@ -60,11 +60,11 @@ async def healthz() -> Heartbeat:
         async with operaton_session() as session:
             get = await session.get(settings.ENGINE_REST_BASE_URL + "/engine")
             await verify_response_status(get, (200,))
-        timestamp = datetime.datetime.utcnow().isoformat()
+        timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
         return Heartbeat(timestamp=timestamp)
 
     # With heartbeat external task triggered at least once
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.timezone.utc)
     if (now - datetime.timedelta(seconds=45)).isoformat() < state.timestamp:
         return Heartbeat(timestamp=state.timestamp)
     age = (now - datetime.datetime.fromisoformat(state.timestamp)).total_seconds()

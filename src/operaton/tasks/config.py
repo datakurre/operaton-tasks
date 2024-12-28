@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     ENGINE_REST_POLL_TTL_SECONDS: int = 10
     ENGINE_REST_LOCK_TTL_SECONDS: int = 30
 
+    TASKS_HEARTBEAT_TOPIC: str = "operaton.tasks.heartbeat"
     TASKS_WORKER_ID: str = "operaton-tasks-client"
     TASKS_MODULE: Optional[str] = None
 
