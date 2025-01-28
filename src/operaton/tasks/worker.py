@@ -4,7 +4,6 @@ from asyncio import FIRST_COMPLETED
 from asyncio import Future
 from asyncio import Lock
 from datetime import datetime
-from operaton.tasks.api import operaton_session
 from operaton.tasks.config import settings
 from operaton.tasks.types import ExtendLockOnExternalTaskDto
 from operaton.tasks.types import ExternalTaskBpmnError
@@ -17,6 +16,7 @@ from operaton.tasks.types import FetchExternalTasksDto
 from operaton.tasks.types import FetchExternalTaskTopicDto
 from operaton.tasks.types import LockedExternalTaskDto
 from operaton.tasks.types import NoOp
+from operaton.tasks.utils import operaton_session
 from operaton.tasks.utils import verify_response_status
 from typing import Dict
 from typing import Set

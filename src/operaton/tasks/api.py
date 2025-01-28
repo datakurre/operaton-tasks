@@ -1,15 +1,14 @@
-from contextlib import asynccontextmanager
 from operaton.tasks.config import handlers
 from operaton.tasks.config import logger
 from operaton.tasks.config import router
 from operaton.tasks.config import settings
 from operaton.tasks.types import ExternalTaskHandler
 from operaton.tasks.types import ExternalTaskTopic
+from operaton.tasks.utils import operaton_session
+from operaton.tasks.worker import external_task_worker
 from typing import Any
-from typing import AsyncGenerator
 from typing import Callable
 from typing import Optional
-import aiohttp
 import sys
 
 
@@ -23,28 +22,6 @@ except ImportError:
     uvicorn: Any = None  # type: ignore
 
     HAS_CLI = False
-
-
-@asynccontextmanager
-async def operaton_session(
-    authorization: Optional[str] = settings.ENGINE_REST_AUTHORIZATION,
-) -> AsyncGenerator[aiohttp.ClientSession, None]:
-    """Get aiohttp session with Operaton headers."""
-    headers = (
-        {
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "Authorization": authorization,
-        }
-        if authorization
-        else {"Content-Type": "application/json", "Accept": "application/json"}
-    )
-    async with aiohttp.ClientSession(
-        headers=headers,
-        trust_env=True,
-        timeout=aiohttp.ClientTimeout(total=settings.ENGINE_REST_TIMEOUT_SECONDS),
-    ) as session:
-        yield session
 
 
 def task(
@@ -103,4 +80,12 @@ def serve() -> None:
         exit(1)
 
 
-__all__ = ["operaton_session", "router", "serve", "task"]
+__all__ = [
+    "external_task_worker",
+    "handlers",
+    "operaton_session",
+    "router",
+    "serve",
+    "settings",
+    "task",
+]

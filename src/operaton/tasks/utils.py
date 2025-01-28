@@ -1,11 +1,37 @@
 from aiohttp import ClientResponse
+from contextlib import asynccontextmanager
 from fastapi.exceptions import HTTPException
+from operaton.tasks.config import settings
+from typing import AsyncGenerator
 from typing import Optional
 from typing import Tuple
 from urllib.parse import urlparse
 from urllib.parse import urlunparse
+import aiohttp
 import math
 import re
+
+
+@asynccontextmanager
+async def operaton_session(
+    authorization: Optional[str] = settings.ENGINE_REST_AUTHORIZATION,
+) -> AsyncGenerator[aiohttp.ClientSession, None]:
+    """Get aiohttp session with Operaton headers."""
+    headers = (
+        {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Authorization": authorization,
+        }
+        if authorization
+        else {"Content-Type": "application/json", "Accept": "application/json"}
+    )
+    async with aiohttp.ClientSession(
+        headers=headers,
+        trust_env=True,
+        timeout=aiohttp.ClientTimeout(total=settings.ENGINE_REST_TIMEOUT_SECONDS),
+    ) as session:
+        yield session
 
 
 # https://www.desmos.com/calculator/n8c16ahnrx
