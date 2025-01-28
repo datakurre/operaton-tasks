@@ -17,7 +17,7 @@ import re
 @asynccontextmanager
 async def operaton_session(
     authorization: Optional[str] = settings.ENGINE_REST_AUTHORIZATION,
-    headers: Optional[Dict[str, str]] = None,
+    headers: Optional[Dict[str, Optional[str]]] = None,
 ) -> AsyncGenerator[aiohttp.ClientSession, None]:
     """Get aiohttp session with Operaton headers."""
     headers = {
