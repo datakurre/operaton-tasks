@@ -17,18 +17,25 @@ import re
 @asynccontextmanager
 async def operaton_session(
     authorization: Optional[str] = settings.ENGINE_REST_AUTHORIZATION,
-    headers: Dict[str, str] = Field(default_factory=dict),
+    headers: Optional[Dict[str, str]] = None,
 ) -> AsyncGenerator[aiohttp.ClientSession, None]:
     """Get aiohttp session with Operaton headers."""
-    headers = (
-        {
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "Authorization": authorization,
-        }
-        if authorization
-        else {"Content-Type": "application/json", "Accept": "application/json"}
-    ) | headers
+    headers = {
+        key: value
+        for key, value in (
+            (
+                {
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                    "Authorization": authorization,
+                }
+                if authorization
+                else {"Content-Type": "application/json", "Accept": "application/json"}
+            )
+            | (headers or {})
+        ).items()
+        if value
+    }
     async with aiohttp.ClientSession(
         headers=headers,
         trust_env=True,
