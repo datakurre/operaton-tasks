@@ -2,7 +2,9 @@ from aiohttp import ClientResponse
 from contextlib import asynccontextmanager
 from fastapi.exceptions import HTTPException
 from operaton.tasks.config import settings
+from pydantic import Field
 from typing import AsyncGenerator
+from typing import Dict
 from typing import Optional
 from typing import Tuple
 from urllib.parse import urlparse
@@ -15,6 +17,7 @@ import re
 @asynccontextmanager
 async def operaton_session(
     authorization: Optional[str] = settings.ENGINE_REST_AUTHORIZATION,
+    headers: Dict[str, str] = Field(default_factory=dict),
 ) -> AsyncGenerator[aiohttp.ClientSession, None]:
     """Get aiohttp session with Operaton headers."""
     headers = (
@@ -25,7 +28,7 @@ async def operaton_session(
         }
         if authorization
         else {"Content-Type": "application/json", "Accept": "application/json"}
-    )
+    ) | headers
     async with aiohttp.ClientSession(
         headers=headers,
         trust_env=True,
