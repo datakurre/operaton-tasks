@@ -2,7 +2,6 @@ from aiohttp import ClientResponse
 from contextlib import asynccontextmanager
 from fastapi.exceptions import HTTPException
 from operaton.tasks.config import settings
-from pydantic import Field
 from typing import AsyncGenerator
 from typing import Dict
 from typing import Optional
@@ -20,7 +19,7 @@ async def operaton_session(
     headers: Optional[Dict[str, Optional[str]]] = None,
 ) -> AsyncGenerator[aiohttp.ClientSession, None]:
     """Get aiohttp session with Operaton headers."""
-    headers = {
+    headers_: Dict[str, str] = {
         key: value
         for key, value in (
             (
@@ -37,7 +36,7 @@ async def operaton_session(
         if value
     }
     async with aiohttp.ClientSession(
-        headers=headers,
+        headers=headers_,
         trust_env=True,
         timeout=aiohttp.ClientTimeout(total=settings.ENGINE_REST_TIMEOUT_SECONDS),
     ) as session:
