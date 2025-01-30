@@ -1,7 +1,7 @@
 [project]
 name = "operaton-tasks"
 version = "1.0.0a1"
-description = ""
+description = "External task library and client for Operaton"
 readme = "README.md"
 authors = [
     {name = "Asko Soukka", email = "asko.soukka@iki.fi"},
