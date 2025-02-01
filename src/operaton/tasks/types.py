@@ -37,6 +37,7 @@ class VariableValueType(str, Enum):
     File = "File"
     Json = "Json"
     Xml = "Xml"
+    Object = "Object"
 
 
 ###
