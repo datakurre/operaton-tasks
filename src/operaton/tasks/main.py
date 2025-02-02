@@ -7,7 +7,6 @@ from operaton.tasks.config import handlers
 from operaton.tasks.config import router
 from operaton.tasks.config import settings
 from operaton.tasks.config import stream_handler
-from operaton.tasks.config import update
 from operaton.tasks.worker import external_task_worker
 from pathlib import Path
 from starlette.requests import Request
@@ -48,7 +47,6 @@ logger.setLevel(settings.LOG_LEVEL)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[Any, Any]:
     """Start external task worker on FastAPI startup."""
-    update()
     if settings.TASKS_MODULE:
         module_name = hashlib.sha256(settings.TASKS_MODULE.encode("utf-8")).hexdigest()
         spec = importlib.util.spec_from_file_location(
