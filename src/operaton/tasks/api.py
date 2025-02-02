@@ -2,12 +2,12 @@ from operaton.tasks.config import handlers
 from operaton.tasks.config import router
 from operaton.tasks.config import settings
 from operaton.tasks.config import stream_handler
-from operaton.tasks.types import ExternalTaskHandler
-from operaton.tasks.types import ExternalTaskTopic
+from operaton.tasks.deco import task
+from operaton.tasks.main import logger as logger_main
 from operaton.tasks.utils import operaton_session
 from operaton.tasks.worker import external_task_worker
+from operaton.tasks.worker import logger as logger_worker
 from typing import Any
-from typing import Callable
 from typing import Optional
 import logging
 import sys
@@ -30,17 +30,12 @@ logger.addHandler(stream_handler)
 logger.setLevel(settings.LOG_LEVEL)
 
 
-def task(
-    topic: str,
-    localVariables: bool = True,
-) -> Callable[[ExternalTaskHandler], ExternalTaskHandler]:
-    """Register function as a service task."""
-
-    def decorator(func: ExternalTaskHandler) -> ExternalTaskHandler:
-        handlers[topic] = ExternalTaskTopic(handler=func, localVariables=localVariables)
-        return func
-
-    return decorator
+def set_log_level(log_level: str) -> None:
+    settings.LOG_LEVEL = log_level
+    stream_handler.setLevel(log_level)
+    logger.setLevel(log_level)
+    logger_main.setLevel(log_level)
+    logger_worker.setLevel(log_level)
 
 
 if HAS_CLI:
@@ -65,7 +60,6 @@ if HAS_CLI:
         settings.ENGINE_REST_TIMEOUT_SECONDS = timeout
         settings.ENGINE_REST_POLL_TTL_SECONDS = poll_ttl
         settings.ENGINE_REST_LOCK_TTL_SECONDS = lock_ttl
-        settings.LOG_LEVEL = log_level
         settings.TASKS_WORKER_ID = worker_id
         settings.TASKS_MODULE = None
 
@@ -94,5 +88,6 @@ __all__ = [
     "serve",
     "settings",
     "stream_handler",
+    "set_log_level",
     "task",
 ]

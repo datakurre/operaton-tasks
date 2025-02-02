@@ -2,11 +2,11 @@
 
 from contextlib import asynccontextmanager
 from fastapi.applications import FastAPI
-from operaton.tasks import healthz
 from operaton.tasks.config import handlers
 from operaton.tasks.config import router
 from operaton.tasks.config import settings
 from operaton.tasks.config import stream_handler
+from operaton.tasks.healthz import healthz  # noqa  # keep import for registration
 from operaton.tasks.worker import external_task_worker
 from pathlib import Path
 from starlette.requests import Request
@@ -34,9 +34,6 @@ except ImportError:
     uvicorn: Any = None  # type: ignore
 
     HAS_CLI = False
-
-
-assert healthz  # import registers healthz task handler
 
 
 logger = logging.getLogger(__name__)

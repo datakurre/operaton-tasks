@@ -33,16 +33,6 @@ stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(formatter)
 stream_handler.setLevel(settings.LOG_LEVEL)
 
-logger = logging.getLogger(__name__)
-logger.addHandler(stream_handler)
-logger.setLevel(settings.LOG_LEVEL)
-
-
-def update() -> None:
-    stream_handler.setLevel(settings.LOG_LEVEL)
-    logger.setLevel(settings.LOG_LEVEL)
-
-
 # Built-in FastAPI router
 router = APIRouter()
 
@@ -50,4 +40,4 @@ router = APIRouter()
 handlers: Dict[str, ExternalTaskTopic] = {}
 
 
-__all__ = ["settings", "stream_handler", "router", "handlers", "update"]
+__all__ = ["settings", "stream_handler", "router", "handlers"]
