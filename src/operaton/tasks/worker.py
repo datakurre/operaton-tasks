@@ -5,6 +5,7 @@ from asyncio import Future
 from asyncio import Lock
 from datetime import datetime
 from operaton.tasks.config import settings
+from operaton.tasks.config import stream_handler
 from operaton.tasks.types import ExtendLockOnExternalTaskDto
 from operaton.tasks.types import ExternalTaskBpmnError
 from operaton.tasks.types import ExternalTaskComplete
@@ -28,6 +29,8 @@ import traceback
 
 
 logger = logging.getLogger(__name__)
+logger.addHandler(stream_handler)
+logger.setLevel(settings.LOG_LEVEL)
 
 
 async def executor(

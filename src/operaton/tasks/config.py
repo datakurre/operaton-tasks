@@ -33,10 +33,9 @@ stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(formatter)
 stream_handler.setLevel(settings.LOG_LEVEL)
 
-logger = logging.getLogger("operaton.tasks")
+logger = logging.getLogger(__name__)
 logger.addHandler(stream_handler)
 logger.setLevel(settings.LOG_LEVEL)
-logger.propagate = False
 
 
 def update() -> None:
@@ -51,4 +50,4 @@ router = APIRouter()
 handlers: Dict[str, ExternalTaskTopic] = {}
 
 
-__all__ = ["logger", "settings", "router", "handlers", "update"]
+__all__ = ["settings", "stream_handler", "router", "handlers", "update"]

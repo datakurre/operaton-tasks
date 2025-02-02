@@ -6,6 +6,7 @@ from operaton.tasks import healthz
 from operaton.tasks.config import handlers
 from operaton.tasks.config import router
 from operaton.tasks.config import settings
+from operaton.tasks.config import stream_handler
 from operaton.tasks.config import update
 from operaton.tasks.worker import external_task_worker
 from pathlib import Path
@@ -40,6 +41,8 @@ assert healthz  # import registers healthz task handler
 
 
 logger = logging.getLogger(__name__)
+logger.addHandler(stream_handler)
+logger.setLevel(settings.LOG_LEVEL)
 
 
 @asynccontextmanager

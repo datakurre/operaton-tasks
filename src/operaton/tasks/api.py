@@ -1,7 +1,7 @@
 from operaton.tasks.config import handlers
-from operaton.tasks.config import logger
 from operaton.tasks.config import router
 from operaton.tasks.config import settings
+from operaton.tasks.config import stream_handler
 from operaton.tasks.types import ExternalTaskHandler
 from operaton.tasks.types import ExternalTaskTopic
 from operaton.tasks.utils import operaton_session
@@ -9,6 +9,7 @@ from operaton.tasks.worker import external_task_worker
 from typing import Any
 from typing import Callable
 from typing import Optional
+import logging
 import sys
 
 
@@ -22,6 +23,11 @@ except ImportError:
     uvicorn: Any = None  # type: ignore
 
     HAS_CLI = False
+
+
+logger = logging.getLogger(__name__)
+logger.addHandler(stream_handler)
+logger.setLevel(settings.LOG_LEVEL)
 
 
 def task(
@@ -87,5 +93,6 @@ __all__ = [
     "router",
     "serve",
     "settings",
+    "stream_handler",
     "task",
 ]
