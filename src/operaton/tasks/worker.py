@@ -265,7 +265,9 @@ async def external_task_worker(
         restart_dt = datetime.utcnow()
         # noinspection PyBroadException
         try:
-            async with operaton_session() as http:
+            async with operaton_session(
+                authorization=settings.ENGINE_REST_AUTHORIZATION,
+            ) as http:
                 await fetch_and_lock_and_complete(http, handlers)
         except Exception as e:  # pylint: disable=W0703
             logger.exception(

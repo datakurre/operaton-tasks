@@ -57,7 +57,9 @@ async def healthz() -> Heartbeat:
 
     # Without heartbeat external task triggered
     if state.timestamp is None:
-        async with operaton_session() as session:
+        async with operaton_session(
+            authorization=settings.ENGINE_REST_AUTHORIZATION,
+        ) as session:
             get = await session.get(settings.ENGINE_REST_BASE_URL + "/engine")
             await verify_response_status(get, (200,))
         timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
