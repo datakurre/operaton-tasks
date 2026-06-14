@@ -6,6 +6,7 @@ from operaton.tasks.types import ExternalTaskComplete
 from operaton.tasks.types import LockedExternalTaskDto
 from operaton.tasks.types import VariableValueDto
 from operaton.tasks.utils import operaton_session
+from operaton.tasks.utils import request_with_auth_retry
 from operaton.tasks.utils import verify_response_status
 from pydantic import BaseModel
 from pydantic import Field
@@ -57,10 +58,12 @@ async def healthz() -> Heartbeat:
 
     # Without heartbeat external task triggered
     if state.timestamp is None:
-        async with operaton_session(
-            authorization=settings.ENGINE_REST_AUTHORIZATION,
-        ) as session:
-            get = await session.get(settings.ENGINE_REST_BASE_URL + "/engine")
+        async with operaton_session() as session:
+            get = await request_with_auth_retry(
+                session,
+                "GET",
+                settings.ENGINE_REST_BASE_URL + "/engine",
+            )
             await verify_response_status(get, (200,))
         timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
         return Heartbeat(timestamp=timestamp)

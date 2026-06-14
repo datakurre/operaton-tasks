@@ -10,6 +10,10 @@ import logging
 class Settings(BaseSettings):
     ENGINE_REST_BASE_URL: str = "http://localhost:8080/engine-rest"
     ENGINE_REST_AUTHORIZATION: Optional[str] = None
+    OAUTH2_CLIENT_ID: Optional[str] = None
+    OAUTH2_CLIENT_SECRET: Optional[str] = None
+    OAUTH2_TOKEN_URL: Optional[str] = None
+    OAUTH2_SCOPES: Optional[str] = None
 
     ENGINE_REST_TIMEOUT_SECONDS: int = 20
     ENGINE_REST_POLL_TTL_SECONDS: int = 10

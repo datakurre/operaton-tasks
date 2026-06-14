@@ -18,6 +18,7 @@ from operaton.tasks.types import FetchExternalTaskTopicDto
 from operaton.tasks.types import LockedExternalTaskDto
 from operaton.tasks.types import NoOp
 from operaton.tasks.utils import operaton_session
+from operaton.tasks.utils import request_with_auth_retry
 from operaton.tasks.utils import verify_response_status
 from typing import Dict
 from typing import Set
@@ -73,7 +74,12 @@ async def complete_task(
         url = f"{settings.ENGINE_REST_BASE_URL}/external-task/{result.task.id}/complete"
 
     async with MUTEX:
-        response = await http.post(url, data=result.response.model_dump_json())
+        response = await request_with_auth_retry(
+            http,
+            "POST",
+            url,
+            data=result.response.model_dump_json(),
+        )
 
     if response.status not in [204, 404]:
         msg = await response.text()
@@ -112,7 +118,9 @@ async def extend_lock(
     for task in [t for t in pending if isinstance(t, asyncio.Task)]:
         task_id = task.get_name().rsplit(":", 1)[-1]
         url = f"{settings.ENGINE_REST_BASE_URL}/external-task/{task_id}/extendLock"
-        await http.post(
+        await request_with_auth_retry(
+            http,
+            "POST",
             url,
             data=ExtendLockOnExternalTaskDto(
                 workerId=settings.TASKS_WORKER_ID,
@@ -125,10 +133,12 @@ async def unlock_all(http: ClientSession) -> None:
     """Unlock all external tasks owned by this worker."""
     url = f"{settings.ENGINE_REST_BASE_URL}/external-task"
     params = {"workerId": settings.TASKS_WORKER_ID}
-    response = await (await http.get(url, params=params)).json()
+    response = await (
+        await request_with_auth_retry(http, "GET", url, params=params)
+    ).json()
     for task in response:
         url = f"{settings.ENGINE_REST_BASE_URL}/external-task/{task['id']}/unlock"
-        await http.post(url)
+        await request_with_auth_retry(http, "POST", url)
 
 
 async def fail_task(
@@ -141,13 +151,18 @@ async def fail_task(
     url = f"{settings.ENGINE_REST_BASE_URL}/external-task/{result.task.id}/failure"
 
     async with MUTEX:
-        response = await http.post(url, data=result.response.model_dump_json())
+        response = await request_with_auth_retry(
+            http,
+            "POST",
+            url,
+            data=result.response.model_dump_json(),
+        )
     if response.status not in [204, 404]:
         logger.error("Unexpected error: %s", await response.text())
 
     if response.status not in [404] and not result.response.retryTimeout:
         url = f"{settings.ENGINE_REST_BASE_URL}/external-task/{result.task.id}/unlock"
-        await http.post(url)
+        await request_with_auth_retry(http, "POST", url)
 
     logger.debug("Failed %s.", result.response)
 
@@ -188,7 +203,12 @@ async def fetch_and_lock_and_complete(
     # Reset locks for current worker and workaround strange Operaton 7.14(?) long poll
     # issue where first poll was lost until the first lock timeout was reached
     await unlock_all(http)
-    await http.post(poll_url, data=poll_topics(handlers, 1000, 0, 1).model_dump_json())
+    await request_with_auth_retry(
+        http,
+        "POST",
+        poll_url,
+        data=poll_topics(handlers, 1000, 0, 1).model_dump_json(),
+    )
     await unlock_all(http)
 
     pending: Set[
@@ -212,7 +232,12 @@ async def fetch_and_lock_and_complete(
 
         poll_task = (
             asyncio.create_task(
-                http.post(poll_url, data=poll_topics(handlers).model_dump_json()),
+                request_with_auth_retry(
+                    http,
+                    "POST",
+                    poll_url,
+                    data=poll_topics(handlers).model_dump_json(),
+                ),
                 name="fetchAndLock",
             )
             if poll_task is None or poll_task.done()
@@ -265,9 +290,7 @@ async def external_task_worker(
         restart_dt = datetime.utcnow()
         # noinspection PyBroadException
         try:
-            async with operaton_session(
-                authorization=settings.ENGINE_REST_AUTHORIZATION,
-            ) as http:
+            async with operaton_session() as http:
                 await fetch_and_lock_and_complete(http, handlers)
         except Exception as e:  # pylint: disable=W0703
             logger.exception(
