@@ -87,6 +87,10 @@ if HAS_CLI:
         module: Path,
         base_url: str = "http://localhost:8080/engine-rest",
         authorization: Optional[str] = None,
+        oauth2_client_id: Optional[str] = None,
+        oauth2_client_secret: Optional[str] = None,
+        oauth2_token_url: Optional[str] = None,
+        oauth2_scopes: Optional[str] = None,
         timeout: int = 20,
         poll_ttl: int = 10,
         lock_ttl: int = 30,
@@ -99,6 +103,10 @@ if HAS_CLI:
         """CLI."""
         settings.ENGINE_REST_BASE_URL = base_url
         settings.ENGINE_REST_AUTHORIZATION = authorization
+        settings.OAUTH2_CLIENT_ID = oauth2_client_id
+        settings.OAUTH2_CLIENT_SECRET = oauth2_client_secret
+        settings.OAUTH2_TOKEN_URL = oauth2_token_url
+        settings.OAUTH2_SCOPES = oauth2_scopes
         settings.ENGINE_REST_TIMEOUT_SECONDS = timeout
         settings.ENGINE_REST_POLL_TTL_SECONDS = poll_ttl
         settings.ENGINE_REST_LOCK_TTL_SECONDS = lock_ttl
@@ -116,7 +124,11 @@ if HAS_CLI:
                 temp_file.writelines(
                     [
                         f"ENGINE_REST_BASE_URL={base_url}\n",
-                        f"ENGINE_REST_AUTHORIZATION={authorization}\n",
+                        f"ENGINE_REST_AUTHORIZATION={authorization or ''}\n",
+                        f"OAUTH2_CLIENT_ID={oauth2_client_id or ''}\n",
+                        f"OAUTH2_CLIENT_SECRET={oauth2_client_secret or ''}\n",
+                        f"OAUTH2_TOKEN_URL={oauth2_token_url or ''}\n",
+                        f"OAUTH2_SCOPES={oauth2_scopes or ''}\n",
                         f"ENGINE_REST_TIMEOUT_SECONDS={timeout}\n",
                         f"ENGINE_REST_POLL_TTL_SECONDS={poll_ttl}\n",
                         f"ENGINE_REST_LOCK_TTL_SECONDS={lock_ttl}\n",

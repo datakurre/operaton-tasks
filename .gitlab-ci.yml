@@ -1,0 +1,99 @@
+stages:
+  - lint
+  - test
+  - build
+  - publish
+
+variables:
+  NIX_CACHE_DIR: $CI_PROJECT_DIR/.nix-cache
+  CACHIX_AUTH_TOKEN: $CACHIX_AUTH_TOKEN
+
+cache:
+  key:
+    files:
+      - devenv.yaml
+      - devenv.nix
+      - devenv.lock
+    prefix: nix-devenv
+  paths:
+    - .devenv/
+    - .nix-cache/
+
+lint:
+  stage: lint
+  image: nixpkgs/nix:latest
+  script:
+    - nix develop --no-update-lock-file --command make check
+  cache:
+    <<: *default_cache
+    key:
+      files:
+        - devenv.yaml
+        - devenv.nix
+        - devenv.lock
+      prefix: nix-lint
+  artifacts:
+    reports:
+      junit: test-results.xml
+    paths:
+      - htmlcov/
+    expire_in: 30 days
+    when: always
+
+test:
+  stage: test
+  image: nixpkgs/nix:latest
+  script:
+    - nix develop --no-update-lock-file --command make devenv-test
+  cache:
+    <<: *default_cache
+    key:
+      files:
+        - devenv.yaml
+        - devenv.nix
+        - devenv.lock
+      prefix: nix-test
+  artifacts:
+    reports:
+      junit: test-results.xml
+    paths:
+      - htmlcov/
+    expire_in: 30 days
+    when: always
+  timeout: 15 minutes
+
+build:
+  stage: build
+  image: nixpkgs/nix:latest
+  script:
+    - nix develop --no-update-lock-file --command make build
+  artifacts:
+    paths:
+      - result/
+    expire_in: 30 days
+  only:
+    - tags
+    - /^release\/.*$/
+  cache:
+    <<: *default_cache
+    key:
+      files:
+        - devenv.yaml
+        - devenv.nix
+        - devenv.lock
+      prefix: nix-build
+
+publish:
+  stage: publish
+  image: python:3.12-slim
+  script:
+    - pip install twine
+    - twine upload result/*.tar.gz result/*.whl --skip-existing
+  artifacts:
+    paths:
+      - result/
+    expire_in: 30 days
+  only:
+    - tags
+  dependencies:
+    - build
