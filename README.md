@@ -1,5 +1,9 @@
 # operaton-tasks
 
+[![GitHub Actions CI](https://github.com/vasara-bpm/operaton-tasks/actions/workflows/ci.yml/badge.svg)](https://github.com/vasara-bpm/operaton-tasks/actions/workflows/ci.yml)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/downloads/)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-yellow.svg)](https://opensource.org/licenses/Apache-2.0)
+
 External task library and worker for https://operaton.org/
 
 Use this package when you want to implement Operaton external service task workers in Python.
@@ -209,3 +213,75 @@ GET /healthz is included on the built-in router.
 
 - Without heartbeat activity, it checks Operaton engine reachability.
 - With heartbeat activity, it verifies recent heartbeat timestamps.
+
+## Development
+
+This project uses [devenv.sh](https://devenv.sh/) for reproducible development environments with Nix.
+
+### Local Development
+
+Enter the development shell:
+
+```bash
+devenv shell
+# or
+make shell
+```
+
+Build and link the virtual environment:
+
+```bash
+make env
+```
+
+### Running Tests Locally
+
+Run all checks (linting, type checking, unit tests):
+
+```bash
+make test
+```
+
+Run individual checks:
+
+```bash
+make check           # treefmt, flake8, mypy
+make test-pytest     # Unit tests only
+make devenv-test     # Integration tests with Operaton + Keycloak services
+```
+
+Start background services (Operaton + Keycloak) for manual testing:
+
+```bash
+make devenv-up       # Start services
+make devenv-down     # Stop services
+```
+
+Watch mode for development:
+
+```bash
+make watch           # Run app in reload mode
+make watch-tests     # Continuously run mypy + pytest
+```
+
+### CI/CD Pipelines
+
+This project includes GitHub Actions and GitLab CI pipelines configured with `devenv.sh` best practices.
+
+**GitHub Actions** (`.github/workflows/`):
+- `ci.yml`: Runs on push, pull requests, and manual dispatch. Executes linting, type checking, and integration tests.
+- `release.yml`: Publishes to PyPI on version tags (v*).
+
+**GitLab CI** (`.gitlab-ci.yml`):
+- Lint stage: treefmt, flake8, mypy
+- Test stage: Unit and integration tests with live Operaton + Keycloak services
+- Build & Publish stages: Triggered on tags
+
+Both pipelines use:
+- Nix for reproducible environments (via `devenv`)
+- Magic Nix Cache (GitHub) or Nix cache directories (GitLab) for faster builds
+- `devenv shell -- make <target>` to ensure identical environments between local development and CI
+
+For PyPI publishing, configure:
+- **GitHub Actions**: Use [trusted publishers (OIDC)](https://docs.pypi.org/trusted-publishers/) or set `PYPI_API_TOKEN` secret
+- **GitLab CI**: Set `PYPI_TOKEN` CI/CD variable with your PyPI token

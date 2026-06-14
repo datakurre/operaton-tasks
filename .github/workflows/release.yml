@@ -1,0 +1,103 @@
+name: Release to PyPI
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v13
+        with:
+          logger: pretty
+          diagnostic-endpoint: ""
+
+      - name: Setup Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@v7
+
+      - name: Run linting & type checks
+        run: nix develop --no-update-lock-file --command make check
+
+  test:
+    name: Tests
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v13
+        with:
+          logger: pretty
+          diagnostic-endpoint: ""
+
+      - name: Setup Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@v7
+
+      - name: Run integration tests
+        run: nix develop --no-update-lock-file --command make devenv-test
+        timeout-minutes: 15
+
+  build:
+    name: Build Package
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v13
+        with:
+          logger: pretty
+          diagnostic-endpoint: ""
+
+      - name: Setup Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@v7
+
+      - name: Build wheel
+        run: nix develop --no-update-lock-file --command make build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: result/
+
+  publish:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/operaton-tasks/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v13
+        with:
+          logger: pretty
+          diagnostic-endpoint: ""
+
+      - name: Setup Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@v7
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
