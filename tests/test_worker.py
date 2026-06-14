@@ -795,3 +795,68 @@ def test_external_task_worker_loops_without_jitter_after_medium_run(
 
     assert fetch_calls == 2
     assert sleep_calls == [0.0, 0.0]
+
+
+def test_format_error_message_for_generic_errors() -> None:
+    """Test format_error_message for non-401 errors."""
+    error = RuntimeError("some generic error")
+    formatted = worker_module.format_error_message(error)
+    assert formatted == "some generic error"
+
+
+def test_format_error_message_for_401_errors() -> None:
+    """Test format_error_message for 401 authentication errors."""
+    error = RuntimeError("401 Unauthorized")
+    formatted = worker_module.format_error_message(error)
+    assert "Authentication failed" in formatted
+    assert "ENGINE_REST_BASE_URL" in formatted
+    assert "ENGINE_REST_AUTHORIZATION" in formatted
+    assert "Operaton engine is running" in formatted
+
+
+def test_unlock_all_raises_on_401_response(monkeypatch: Any) -> None:
+    """Test unlock_all raises RuntimeError on 401 response."""
+    async def fake_request_with_auth_retry(
+        http: object,
+        method: str,
+        url: str,
+        **kwargs: Any,
+    ) -> FakeClientResponse:
+        return FakeClientResponse(401, text_body="Unauthorized")
+
+    monkeypatch.setattr(
+        worker_module, "request_with_auth_retry", fake_request_with_auth_retry
+    )
+
+    with pytest.raises(RuntimeError, match="Unauthorized \\(401\\)"):
+        asyncio.run(worker_module.unlock_all(object()))
+
+
+def test_unlock_all_raises_on_non_200_non_401_response(monkeypatch: Any) -> None:
+    """Test unlock_all raises HTTPException on non-200, non-401 response."""
+    from fastapi.exceptions import HTTPException
+
+    async def fake_request_with_auth_retry(
+        http: object,
+        method: str,
+        url: str,
+        **kwargs: Any,
+    ) -> FakeClientResponse:
+        return FakeClientResponse(500, text_body="Internal Server Error")
+
+    async def fake_verify_response_status(
+        response: FakeClientResponse,
+        status: tuple[int, ...],
+    ) -> FakeClientResponse:
+        assert response.status == 500
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+
+    monkeypatch.setattr(
+        worker_module, "request_with_auth_retry", fake_request_with_auth_retry
+    )
+    monkeypatch.setattr(
+        worker_module, "verify_response_status", fake_verify_response_status
+    )
+
+    with pytest.raises(HTTPException):
+        asyncio.run(worker_module.unlock_all(object()))

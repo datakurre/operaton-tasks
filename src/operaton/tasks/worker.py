@@ -34,6 +34,23 @@ logger.addHandler(stream_handler)
 logger.setLevel(settings.LOG_LEVEL)
 
 
+def format_error_message(error: Exception) -> str:
+    """Format error message with helpful context for common issues."""
+    error_str = str(error)
+
+    # Handle 401 authentication errors
+    if "401" in error_str or "Unauthorized" in error_str:
+        return (
+            f"{error_str}\n"
+            "→ Authentication failed. Check your configuration:\n"
+            f"  - ENGINE_REST_BASE_URL: {settings.ENGINE_REST_BASE_URL}\n"
+            f"  - ENGINE_REST_AUTHORIZATION: {'set' if settings.ENGINE_REST_AUTHORIZATION else 'not set'}\n"
+            "  - Ensure the Operaton engine is running and accessible"
+        )
+
+    return error_str
+
+
 async def executor(
     handler: ExternalTaskHandler, task: LockedExternalTaskDto
 ) -> Union[ExternalTaskComplete, ExternalTaskFailure]:
@@ -133,9 +150,17 @@ async def unlock_all(http: ClientSession) -> None:
     """Unlock all external tasks owned by this worker."""
     url = f"{settings.ENGINE_REST_BASE_URL}/external-task"
     params = {"workerId": settings.TASKS_WORKER_ID}
-    response = await (
-        await request_with_auth_retry(http, "GET", url, params=params)
-    ).json()
+    resp = await request_with_auth_retry(http, "GET", url, params=params)
+
+    if resp.status == 401:
+        raise RuntimeError(
+            f"Unauthorized (401) to connect to Operaton engine at {url}. "
+            "Check ENGINE_REST_AUTHORIZATION credentials or ENGINE_REST_BASE_URL. "
+            f"Response: {await resp.text()}"
+        )
+
+    await verify_response_status(resp, status=(200,))
+    response = await resp.json()
     for task in response:
         url = f"{settings.ENGINE_REST_BASE_URL}/external-task/{task['id']}/unlock"
         await request_with_auth_retry(http, "POST", url)
@@ -294,7 +319,7 @@ async def external_task_worker(
                 await fetch_and_lock_and_complete(http, handlers)
         except Exception as e:  # pylint: disable=W0703
             logger.exception(
-                "External task worker disconnected: %s", getattr(e, "detail", str(e))
+                "External task worker disconnected: %s", format_error_message(e)
             )
 
         finally:
