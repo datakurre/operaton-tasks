@@ -68,8 +68,9 @@ async def request_with_auth_retry(
     """Execute request and retry once on 401 when using OAuth2."""
     request_kwargs: Dict[str, Any] = dict(kwargs)
     request_headers = dict(request_kwargs.pop("headers", {}) or {})
+    response: Optional[ClientResponse] = None
 
-    for attempt in range(2):
+    for attempt in range(2):  # pragma: no branch
         auth_header = await resolve_authorization_header(authorization)
         headers = dict(request_headers)
         if auth_header and "Authorization" not in headers:
@@ -84,11 +85,12 @@ async def request_with_auth_retry(
             or "Authorization" in request_headers
             or not token_manager.is_configured
         ):
-            return response
+            break
 
         await response.read()
         token_manager.invalidate()
 
+    assert response is not None
     return response
 
 

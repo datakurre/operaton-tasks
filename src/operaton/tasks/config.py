@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from operaton.tasks.types import ExternalTaskTopic
+from operaton.tasks.runtime import ExternalTaskTopic
 from pydantic_settings import BaseSettings
 from typing import Dict
 from typing import Optional

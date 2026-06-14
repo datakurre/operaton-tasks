@@ -10,6 +10,7 @@ from typing import Optional
 import asyncio
 import operaton.tasks.oauth2 as oauth2_module
 import operaton.tasks.utils as utils_module
+import pytest
 
 
 class FakeTokenResponse:
@@ -243,3 +244,125 @@ def test_request_with_auth_retry_retries_once_on_401(monkeypatch: Any) -> None:
     assert session.calls[0]["headers"]["Authorization"] == "Bearer token-1"
     assert session.calls[1]["headers"]["Authorization"] == "Bearer token-2"
     assert fake_token_manager.invalidations == 1
+
+
+def test_oauth2_is_not_configured_when_values_are_missing() -> None:
+    original_client_id = settings.OAUTH2_CLIENT_ID
+    original_client_secret = settings.OAUTH2_CLIENT_SECRET
+    original_token_url = settings.OAUTH2_TOKEN_URL
+    try:
+        settings.OAUTH2_CLIENT_ID = None
+        settings.OAUTH2_CLIENT_SECRET = "secret"
+        settings.OAUTH2_TOKEN_URL = "https://example.test/token"
+
+        assert OAuth2TokenManager().is_configured is False
+    finally:
+        settings.OAUTH2_CLIENT_ID = original_client_id
+        settings.OAUTH2_CLIENT_SECRET = original_client_secret
+        settings.OAUTH2_TOKEN_URL = original_token_url
+
+
+def test_oauth2_invalidate_resets_expiry() -> None:
+    manager = OAuth2TokenManager()
+    manager._expires_at = 123.0
+
+    manager.invalidate()
+
+    assert manager._expires_at == 0.0
+
+
+def test_oauth2_fetch_token_raises_for_incomplete_settings() -> None:
+    original_client_id = settings.OAUTH2_CLIENT_ID
+    original_client_secret = settings.OAUTH2_CLIENT_SECRET
+    original_token_url = settings.OAUTH2_TOKEN_URL
+    try:
+        settings.OAUTH2_CLIENT_ID = None
+        settings.OAUTH2_CLIENT_SECRET = None
+        settings.OAUTH2_TOKEN_URL = None
+
+        with pytest.raises(RuntimeError, match="incomplete"):
+            asyncio.run(OAuth2TokenManager()._fetch_token())
+    finally:
+        settings.OAUTH2_CLIENT_ID = original_client_id
+        settings.OAUTH2_CLIENT_SECRET = original_client_secret
+        settings.OAUTH2_TOKEN_URL = original_token_url
+
+
+def test_oauth2_fetch_token_raises_on_non_200(monkeypatch: Any) -> None:
+    original_client_id = settings.OAUTH2_CLIENT_ID
+    original_client_secret = settings.OAUTH2_CLIENT_SECRET
+    original_token_url = settings.OAUTH2_TOKEN_URL
+    try:
+        settings.OAUTH2_CLIENT_ID = "client"
+        settings.OAUTH2_CLIENT_SECRET = "secret"
+        settings.OAUTH2_TOKEN_URL = "https://example.test/token"
+
+        responses = [FakeTokenResponse(400, {"error": "bad_request"})]
+        calls: List[Dict[str, Any]] = []
+        monkeypatch.setattr(
+            oauth2_module.aiohttp,
+            "ClientSession",
+            lambda: FakeOAuth2ClientSession(responses, calls),
+        )
+
+        with pytest.raises(RuntimeError, match=r"failed \(400\)"):
+            asyncio.run(OAuth2TokenManager()._fetch_token())
+    finally:
+        settings.OAUTH2_CLIENT_ID = original_client_id
+        settings.OAUTH2_CLIENT_SECRET = original_client_secret
+        settings.OAUTH2_TOKEN_URL = original_token_url
+
+
+def test_oauth2_fetch_token_raises_without_access_token(monkeypatch: Any) -> None:
+    original_client_id = settings.OAUTH2_CLIENT_ID
+    original_client_secret = settings.OAUTH2_CLIENT_SECRET
+    original_token_url = settings.OAUTH2_TOKEN_URL
+    try:
+        settings.OAUTH2_CLIENT_ID = "client"
+        settings.OAUTH2_CLIENT_SECRET = "secret"
+        settings.OAUTH2_TOKEN_URL = "https://example.test/token"
+
+        responses = [FakeTokenResponse(200, {"expires_in": 300})]
+        calls: List[Dict[str, Any]] = []
+        monkeypatch.setattr(
+            oauth2_module.aiohttp,
+            "ClientSession",
+            lambda: FakeOAuth2ClientSession(responses, calls),
+        )
+
+        with pytest.raises(RuntimeError, match="did not contain access_token"):
+            asyncio.run(OAuth2TokenManager()._fetch_token())
+    finally:
+        settings.OAUTH2_CLIENT_ID = original_client_id
+        settings.OAUTH2_CLIENT_SECRET = original_client_secret
+        settings.OAUTH2_TOKEN_URL = original_token_url
+
+
+def test_oauth2_fetch_token_raises_on_invalid_expires_in(monkeypatch: Any) -> None:
+    original_client_id = settings.OAUTH2_CLIENT_ID
+    original_client_secret = settings.OAUTH2_CLIENT_SECRET
+    original_token_url = settings.OAUTH2_TOKEN_URL
+    try:
+        settings.OAUTH2_CLIENT_ID = "client"
+        settings.OAUTH2_CLIENT_SECRET = "secret"
+        settings.OAUTH2_TOKEN_URL = "https://example.test/token"
+
+        responses = [
+            FakeTokenResponse(
+                200,
+                {"access_token": "token", "expires_in": "not-a-number"},
+            )
+        ]
+        calls: List[Dict[str, Any]] = []
+        monkeypatch.setattr(
+            oauth2_module.aiohttp,
+            "ClientSession",
+            lambda: FakeOAuth2ClientSession(responses, calls),
+        )
+
+        with pytest.raises(RuntimeError, match="invalid expires_in"):
+            asyncio.run(OAuth2TokenManager()._fetch_token())
+    finally:
+        settings.OAUTH2_CLIENT_ID = original_client_id
+        settings.OAUTH2_CLIENT_SECRET = original_client_secret
+        settings.OAUTH2_TOKEN_URL = original_token_url

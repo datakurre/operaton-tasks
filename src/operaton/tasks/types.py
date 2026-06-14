@@ -10,8 +10,6 @@ from pydantic import AwareDatetime
 from pydantic import BaseModel
 from pydantic import Field
 from typing import Any
-from typing import Awaitable
-from typing import Callable
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -8905,46 +8903,18 @@ TaskQueryDto.model_rebuild()
 # Added manually
 #
 
-
-class NoOp(BaseModel):
-    """Do nothing."""
-
-
-class ExternalTaskComplete(BaseModel):
-    """Completed external task and its response."""
-
-    def __init__(self, **data: Any) -> None:
-        """Init."""
-        super().__init__(**data)
-        if any(
-            [
-                isinstance(data.get("response"), NoOp),
-                isinstance(data.get("response"), CompleteExternalTaskDto),
-                isinstance(data.get("response"), ExternalTaskBpmnError),
-            ]
-        ):
-            # https://github.com/samuelcolvin/pydantic/issues/1423
-            self.response = data["response"]
-
-    task: LockedExternalTaskDto
-    response: Union[CompleteExternalTaskDto, ExternalTaskBpmnError]
+_RUNTIME_EXPORTS = {
+    "ExternalTaskComplete",
+    "ExternalTaskFailure",
+    "ExternalTaskHandler",
+    "ExternalTaskTopic",
+    "NoOp",
+}
 
 
-class ExternalTaskFailure(BaseModel):
-    """Failed external task and its response."""
+def __getattr__(name: str) -> Any:
+    if name in _RUNTIME_EXPORTS:
+        from operaton.tasks import runtime
 
-    task: LockedExternalTaskDto
-    response: ExternalTaskFailureDto
-
-
-ExternalTaskHandler = Callable[
-    [LockedExternalTaskDto],
-    Awaitable[Union[ExternalTaskComplete, ExternalTaskFailure]],
-]
-
-
-class ExternalTaskTopic(BaseModel):
-    """External task topic configuration"""
-
-    handler: ExternalTaskHandler
-    localVariables: bool
+        return getattr(runtime, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
