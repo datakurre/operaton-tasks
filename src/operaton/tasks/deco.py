@@ -1,6 +1,6 @@
 from operaton.tasks.config import handlers
-from operaton.tasks.types import ExternalTaskHandler
-from operaton.tasks.types import ExternalTaskTopic
+from operaton.tasks.runtime import ExternalTaskHandler
+from operaton.tasks.runtime import ExternalTaskTopic
 from typing import Callable
 
 
