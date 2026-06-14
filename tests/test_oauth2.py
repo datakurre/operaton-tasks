@@ -1,8 +1,10 @@
 from operaton.tasks.config import settings
+from operaton.tasks.config import Settings
 from operaton.tasks.oauth2 import OAuth2TokenManager
 from operaton.tasks.utils import operaton_session
 from operaton.tasks.utils import request_with_auth_retry
 from operaton.tasks.utils import resolve_authorization_header
+from pydantic import ValidationError
 from typing import Any
 from typing import Dict
 from typing import List
@@ -366,3 +368,41 @@ def test_oauth2_fetch_token_raises_on_invalid_expires_in(monkeypatch: Any) -> No
         settings.OAUTH2_CLIENT_ID = original_client_id
         settings.OAUTH2_CLIENT_SECRET = original_client_secret
         settings.OAUTH2_TOKEN_URL = original_token_url
+
+
+def test_settings_validator_rejects_both_authorization_and_oauth2() -> None:
+    """Verify that ENGINE_REST_AUTHORIZATION and OAuth2 cannot be configured together."""
+    with pytest.raises(
+        ValidationError,
+        match="Cannot configure both ENGINE_REST_AUTHORIZATION and OAuth2",
+    ):
+        Settings.model_validate(
+            {
+                "ENGINE_REST_AUTHORIZATION": "Basic xyz",
+                "OAUTH2_CLIENT_ID": "client",
+                "OAUTH2_CLIENT_SECRET": "secret",
+                "OAUTH2_TOKEN_URL": "http://example.com/token",
+            }
+        )
+
+
+def test_settings_validator_accepts_authorization_alone(monkeypatch: Any) -> None:
+    """Verify that ENGINE_REST_AUTHORIZATION alone is accepted."""
+    # Clear OAuth2 env vars to simulate only ENGINE_REST_AUTHORIZATION being configured
+    monkeypatch.delenv("OAUTH2_CLIENT_ID", raising=False)
+    monkeypatch.delenv("OAUTH2_CLIENT_SECRET", raising=False)
+    monkeypatch.delenv("OAUTH2_TOKEN_URL", raising=False)
+    s = Settings(ENGINE_REST_AUTHORIZATION="Basic xyz")
+    assert s.ENGINE_REST_AUTHORIZATION == "Basic xyz"
+
+
+def test_settings_validator_accepts_oauth2_alone(monkeypatch: Any) -> None:
+    """Verify that OAuth2 configuration alone is accepted."""
+    # Clear ENGINE_REST_AUTHORIZATION but keep OAuth2
+    monkeypatch.delenv("ENGINE_REST_AUTHORIZATION", raising=False)
+    s = Settings(
+        OAUTH2_CLIENT_ID="client",
+        OAUTH2_CLIENT_SECRET="secret",
+        OAUTH2_TOKEN_URL="http://example.com/token",
+    )
+    assert s.OAUTH2_CLIENT_ID == "client"
