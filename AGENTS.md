@@ -57,8 +57,9 @@ This project uses [devenv](https://devenv.sh/) (Nix-based) for reproducible deve
 ### Important Nix Notes
 
 - Treefmt config shape: `treefmt.config.programs.<formatter>.enable`
-- External modules: `devenv-module-operaton` and `devenv-module-uv2nix` are imported via `devenv.yaml`
-- Python interpreter: Python 3.12 via `languages.python.interpreter`
+- External module: `devenv-module-operaton` is imported via `devenv.yaml`
+- Python dependencies are managed with devenv's built-in `languages.python.uv` support
+- Python interpreter: Python 3.12 via `languages.python.package`
 - `rg` (ripgrep) is NOT on PATH; use `grep` instead
 
 ## Build & Run Commands

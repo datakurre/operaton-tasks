@@ -34,15 +34,18 @@ let
         bash -ec 'code="$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/engine-rest/engine)"; [ "$code" = "200" ] || [ "$code" = "401" ]'
       '';
 
-      languages.python.interpreter = pkgs.python312;
-      languages.python.pyprojectOverrides = final: prev: {
-        "operaton-tasks" = prev."operaton-tasks".overrideAttrs (old: {
-          nativeBuildInputs =
-            old.nativeBuildInputs
-            ++ final.resolveBuildSystem ({
-              "hatchling" = [ ];
-            });
-        });
+      languages.python = {
+        enable = true;
+        package = pkgs.python312;
+        venv.enable = true;
+        uv = {
+          enable = true;
+          sync = {
+            enable = true;
+            allGroups = true;
+            extras = [ "cli" ];
+          };
+        };
       };
 
       treefmt = {
@@ -57,23 +60,6 @@ let
         pkgs.findutils
         pkgs.gnumake
         pkgs.openssl
-        (pkgs.python312.withPackages (
-          ps: with ps; [
-            aiohttp
-            black
-            fastapi
-            flake8
-            isort
-            mypy
-            pydantic
-            pydantic-settings
-            pytest
-            pytest-cov
-            starlette
-            typer
-            uvicorn
-          ]
-        ))
       ];
 
       dotenv.enable = true;
