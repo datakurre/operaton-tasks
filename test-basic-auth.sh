@@ -49,15 +49,6 @@ curl_request() {
   curl "${args[@]}" "$@"
 }
 
-curl_request_strict() {
-  local args=(-fsS)
-  if [[ "$VERBOSE" == true ]]; then
-    args+=(-v)
-  fi
-
-  curl "${args[@]}" "$@"
-}
-
 print_response_body() {
   local body_file=$1
   if [[ "$VERBOSE" != true ]]; then
@@ -71,16 +62,6 @@ print_response_body() {
   else
     echo "<empty>" >&2
   fi
-}
-
-curl_capture_body_strict() {
-  local body_file
-  body_file=$(mktemp)
-
-  curl_request_strict -o "$body_file" "$@"
-  print_response_body "$body_file"
-  cat "$body_file"
-  rm -f "$body_file"
 }
 
 curl_capture_status() {
@@ -121,35 +102,19 @@ expect_2xx() {
   fi
 }
 
-request_access_token() {
-  if [[ -z "${OAUTH2_TOKEN_URL:-}" || -z "${OAUTH2_CLIENT_ID:-}" || -z "${OAUTH2_CLIENT_SECRET:-}" ]]; then
-    return 1
-  fi
-
-  local response
-  response=$(curl_capture_body_strict \
-    -H 'Content-Type: application/x-www-form-urlencoded' \
-    --data-urlencode 'grant_type=client_credentials' \
-    --data-urlencode "client_id=$OAUTH2_CLIENT_ID" \
-    --data-urlencode "client_secret=$OAUTH2_CLIENT_SECRET" \
-    "$OAUTH2_TOKEN_URL")
-
-  printf '%s' "$response" | tr -d '\n' | sed -n 's/.*"access_token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p'
-}
-
 echo "Checking unauthenticated /engine-rest access"
 unauthenticated_status=$(curl_capture_status true "$ENGINE_REST_URL")
 expected_unauthenticated=${EXPECTED_UNAUTHENTICATED_STATUS:-401}
-print_status "/engine-rest without token" "$unauthenticated_status" "$expected_unauthenticated"
+print_status "/engine-rest without auth" "$unauthenticated_status" "$expected_unauthenticated"
 
-if access_token=$(request_access_token); then
+if [[ -n "${ENGINE_REST_AUTHORIZATION:-}" ]]; then
   echo "Checking authenticated /engine-rest access"
   authenticated_status=$(curl_capture_status true \
-    -H "Authorization: Bearer $access_token" \
+    -H "Authorization: $ENGINE_REST_AUTHORIZATION" \
     "$ENGINE_REST_URL")
-  expect_2xx "/engine-rest with bearer token" "$authenticated_status"
+  expect_2xx "/engine-rest with authorization header" "$authenticated_status"
 else
-  echo "Skipping authenticated check; set OAUTH2_TOKEN_URL, OAUTH2_CLIENT_ID, and OAUTH2_CLIENT_SECRET to enable it"
+  echo "Skipping authenticated check; set ENGINE_REST_AUTHORIZATION to enable it"
 fi
 
 echo "Checking cockpit remains available"

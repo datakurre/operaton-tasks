@@ -14,10 +14,6 @@ let
         forwardHeadersStrategy = "native";
         package = devenv-module-operaton.packages.${pkgs.stdenv.hostPlatform.system}.default;
         deployment = ./fixture/operaton;
-        oauth2 = {
-          enable = true;
-          issuerUri = "http://localhost:8081/realms/operaton";
-        };
       };
 
       services.keycloak = {
