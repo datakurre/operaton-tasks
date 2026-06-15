@@ -33,19 +33,14 @@ async def operaton_session(
     headers: Optional[Dict[str, Optional[str]]] = None,
 ) -> AsyncGenerator[aiohttp.ClientSession, None]:
     """Get aiohttp session with Operaton headers."""
-    auth_header = await resolve_authorization_header(authorization)
+    # Note: Authorization is intentionally NOT set at the session level.
+    # request_with_auth_retry sets it per-request, which avoids duplicate
+    # Authorization headers that aiohttp would produce via CIMultiDict.add()
+    # when the same key exists in both session and per-request headers.
     headers_: Dict[str, str] = {
         key: value
         for key, value in (
-            (
-                {
-                    "Content-Type": "application/json",
-                    "Accept": "application/json",
-                    "Authorization": auth_header,
-                }
-                if auth_header
-                else {"Content-Type": "application/json", "Accept": "application/json"}
-            )
+            {"Content-Type": "application/json", "Accept": "application/json"}
             | (headers or {})
         ).items()
         if value

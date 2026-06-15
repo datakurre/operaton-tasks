@@ -187,7 +187,10 @@ def test_oauth2_token_manager_refreshes_when_near_expiry(monkeypatch: Any) -> No
         settings.OAUTH2_TOKEN_URL = original_token_url
 
 
-def test_operaton_session_uses_oauth2_bearer_header(monkeypatch: Any) -> None:
+def test_operaton_session_does_not_set_session_level_auth(monkeypatch: Any) -> None:
+    # Authorization is intentionally NOT set at the session level — it would cause
+    # duplicate Authorization headers because request_with_auth_retry also sets it
+    # per-request via CIMultiDict.add(), which appends rather than replaces.
     fake_token_manager = FakeTokenManager(tokens=["session-token"], configured=True)
     monkeypatch.setattr(utils_module, "token_manager", fake_token_manager)
     fake_factory = FakeSessionFactory()
@@ -200,7 +203,8 @@ def test_operaton_session_uses_oauth2_bearer_header(monkeypatch: Any) -> None:
     asyncio.run(run())
 
     assert fake_factory.headers is not None
-    assert fake_factory.headers["Authorization"] == "Bearer session-token"
+    assert "Authorization" not in fake_factory.headers
+    assert fake_factory.headers.get("Content-Type") == "application/json"
 
 
 def test_resolve_authorization_header_falls_back_to_static(monkeypatch: Any) -> None:

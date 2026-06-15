@@ -118,6 +118,10 @@ def test_api_cli_serve_configures_proxy_headers(monkeypatch: Any) -> None:
     callback(
         base_url="https://engine.test/rest",
         authorization="Basic token",
+        oauth2_client_id="client-id",
+        oauth2_client_secret="client-secret",
+        oauth2_token_url="https://id.example/token",
+        oauth2_scopes="scope-a",
         timeout=12,
         poll_ttl=13,
         lock_ttl=14,
@@ -129,6 +133,10 @@ def test_api_cli_serve_configures_proxy_headers(monkeypatch: Any) -> None:
     assert calls == ["uvicorn"]
     assert api_module.settings.ENGINE_REST_BASE_URL == "https://engine.test/rest"
     assert api_module.settings.ENGINE_REST_AUTHORIZATION == "Basic token"
+    assert api_module.settings.OAUTH2_CLIENT_ID == "client-id"
+    assert api_module.settings.OAUTH2_CLIENT_SECRET == "client-secret"
+    assert api_module.settings.OAUTH2_TOKEN_URL == "https://id.example/token"
+    assert api_module.settings.OAUTH2_SCOPES == "scope-a"
     assert api_module.settings.ENGINE_REST_TIMEOUT_SECONDS == 12
     assert api_module.settings.ENGINE_REST_POLL_TTL_SECONDS == 13
     assert api_module.settings.ENGINE_REST_LOCK_TTL_SECONDS == 14
@@ -163,7 +171,20 @@ def test_api_cli_serve_accepts_no_extra_args(monkeypatch: Any) -> None:
     monkeypatch.setattr(api_module.uvicorn, "main", lambda: None)
     monkeypatch.setattr(api_module.sys, "argv", ["operaton-tasks"])
 
-    callback(args=None)
+    callback(
+        base_url=None,
+        authorization=None,
+        oauth2_client_id=None,
+        oauth2_client_secret=None,
+        oauth2_token_url=None,
+        oauth2_scopes=None,
+        timeout=None,
+        poll_ttl=None,
+        lock_ttl=None,
+        worker_id=None,
+        log_level=None,
+        args=None,
+    )
 
     assert api_module.sys.argv == ["operaton-tasks", "operaton.tasks.main:app"]
 
@@ -400,7 +421,7 @@ def test_main_cli_serve_writes_reload_env_file(monkeypatch: Any) -> None:
 
     assert calls == ["uvicorn"]
     assert "ENGINE_REST_BASE_URL=https://engine.test/rest\n" in writes
-    assert f"TASKS_MODULE={Path('heartbeat.py')}\n" in writes
+    assert f"TASKS_MODULE={Path('heartbeat.py').absolute()}\n" in writes
     assert main_module.sys.argv == [
         "operaton-tasks",
         "operaton.tasks.main:app",
@@ -417,7 +438,21 @@ def test_main_cli_serve_accepts_no_extra_args(monkeypatch: Any) -> None:
     monkeypatch.setattr(main_module.uvicorn, "main", lambda: None)
     monkeypatch.setattr(main_module.sys, "argv", ["operaton-tasks"])
 
-    callback(module=Path("heartbeat.py"), args=None)
+    callback(
+        module=Path("heartbeat.py"),
+        base_url=None,
+        authorization=None,
+        oauth2_client_id=None,
+        oauth2_client_secret=None,
+        oauth2_token_url=None,
+        oauth2_scopes=None,
+        timeout=None,
+        poll_ttl=None,
+        lock_ttl=None,
+        worker_id=None,
+        log_level=None,
+        args=None,
+    )
 
     assert main_module.sys.argv == ["operaton-tasks", "operaton.tasks.main:app"]
 

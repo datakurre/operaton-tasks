@@ -810,8 +810,33 @@ def test_format_error_message_for_401_errors() -> None:
     formatted = worker_module.format_error_message(error)
     assert "Authentication failed" in formatted
     assert "ENGINE_REST_BASE_URL" in formatted
-    assert "ENGINE_REST_AUTHORIZATION" in formatted
+    assert "AUTH_METHOD" in formatted
+    assert "OAUTH2_TOKEN_URL" in formatted
     assert "Operaton engine is running" in formatted
+
+
+def test_format_error_message_for_401_errors_uses_basic_auth(monkeypatch: Any) -> None:
+    """Test format_error_message reports basic auth when configured."""
+    monkeypatch.setattr(worker_module.settings, "ENGINE_REST_AUTHORIZATION", "Basic token")
+    monkeypatch.setattr(worker_module.settings, "OAUTH2_CLIENT_ID", None)
+    monkeypatch.setattr(worker_module.settings, "OAUTH2_CLIENT_SECRET", None)
+    monkeypatch.setattr(worker_module.settings, "OAUTH2_TOKEN_URL", None)
+
+    formatted = worker_module.format_error_message(RuntimeError("401 Unauthorized"))
+
+    assert "ENGINE_REST_AUTHORIZATION (Basic/token)" in formatted
+
+
+def test_format_error_message_for_401_errors_with_no_auth(monkeypatch: Any) -> None:
+    """Test format_error_message reports no auth when nothing is configured."""
+    monkeypatch.setattr(worker_module.settings, "ENGINE_REST_AUTHORIZATION", None)
+    monkeypatch.setattr(worker_module.settings, "OAUTH2_CLIENT_ID", None)
+    monkeypatch.setattr(worker_module.settings, "OAUTH2_CLIENT_SECRET", None)
+    monkeypatch.setattr(worker_module.settings, "OAUTH2_TOKEN_URL", None)
+
+    formatted = worker_module.format_error_message(RuntimeError("401 Unauthorized"))
+
+    assert "AUTH_METHOD: none configured" in formatted
 
 
 def test_unlock_all_raises_on_401_response(monkeypatch: Any) -> None:

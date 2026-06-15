@@ -82,36 +82,63 @@ async def cache_headers(
 if HAS_CLI:
     cli = typer.Typer()
 
+    @cli.callback()
+    def cli_callback() -> None:
+        """Operaton External Service Task Worker."""
+
     @cli.command()
     def serve(
-        module: Path,
-        base_url: str = "http://localhost:8080/engine-rest",
-        authorization: Optional[str] = None,
-        oauth2_client_id: Optional[str] = None,
-        oauth2_client_secret: Optional[str] = None,
-        oauth2_token_url: Optional[str] = None,
-        oauth2_scopes: Optional[str] = None,
-        timeout: int = 20,
-        poll_ttl: int = 10,
-        lock_ttl: int = 30,
-        worker_id: str = "operaton-tasks-client",
-        log_level: str = "INFO",
-        args: Optional[list[str]] = typer.Argument(
-            default=None, help="arguments passed to uvicorn"
+        module: Path = typer.Argument(..., help="Path to Python module with task handlers"),
+        args: Optional[list[str]] = typer.Argument(default=None, help="Arguments passed to uvicorn"),
+        base_url: Optional[str] = typer.Option(
+            None, help="Engine REST base URL"
         ),
+        authorization: Optional[str] = typer.Option(
+            None, help="Authorization header value"
+        ),
+        oauth2_client_id: Optional[str] = typer.Option(
+            None, help="OAuth2 client ID"
+        ),
+        oauth2_client_secret: Optional[str] = typer.Option(
+            None, help="OAuth2 client secret"
+        ),
+        oauth2_token_url: Optional[str] = typer.Option(
+            None, help="OAuth2 token URL"
+        ),
+        oauth2_scopes: Optional[str] = typer.Option(
+            None, help="OAuth2 scopes (space-separated)"
+        ),
+        timeout: Optional[int] = typer.Option(None, help="HTTP request timeout in seconds"),
+        poll_ttl: Optional[int] = typer.Option(None, help="Long-poll timeout in seconds"),
+        lock_ttl: Optional[int] = typer.Option(None, help="External task lock duration in seconds"),
+        worker_id: Optional[str] = typer.Option(
+            None, help="Worker ID sent to Operaton"
+        ),
+        log_level: Optional[str] = typer.Option(None, help="Logging level"),
     ) -> None:
-        """CLI."""
-        settings.ENGINE_REST_BASE_URL = base_url
-        settings.ENGINE_REST_AUTHORIZATION = authorization
-        settings.OAUTH2_CLIENT_ID = oauth2_client_id
-        settings.OAUTH2_CLIENT_SECRET = oauth2_client_secret
-        settings.OAUTH2_TOKEN_URL = oauth2_token_url
-        settings.OAUTH2_SCOPES = oauth2_scopes
-        settings.ENGINE_REST_TIMEOUT_SECONDS = timeout
-        settings.ENGINE_REST_POLL_TTL_SECONDS = poll_ttl
-        settings.ENGINE_REST_LOCK_TTL_SECONDS = lock_ttl
-        settings.TASKS_WORKER_ID = worker_id
-        settings.LOG_LEVEL = log_level
+        """Run External Service Task Worker."""
+        if base_url is not None:
+            settings.ENGINE_REST_BASE_URL = base_url
+        if authorization is not None:
+            settings.ENGINE_REST_AUTHORIZATION = authorization
+        if oauth2_client_id is not None:
+            settings.OAUTH2_CLIENT_ID = oauth2_client_id
+        if oauth2_client_secret is not None:
+            settings.OAUTH2_CLIENT_SECRET = oauth2_client_secret
+        if oauth2_token_url is not None:
+            settings.OAUTH2_TOKEN_URL = oauth2_token_url
+        if oauth2_scopes is not None:
+            settings.OAUTH2_SCOPES = oauth2_scopes
+        if timeout is not None:
+            settings.ENGINE_REST_TIMEOUT_SECONDS = timeout
+        if poll_ttl is not None:
+            settings.ENGINE_REST_POLL_TTL_SECONDS = poll_ttl
+        if lock_ttl is not None:
+            settings.ENGINE_REST_LOCK_TTL_SECONDS = lock_ttl
+        if worker_id is not None:
+            settings.TASKS_WORKER_ID = worker_id
+        if log_level is not None:
+            settings.LOG_LEVEL = log_level
         settings.TASKS_MODULE = f"{module.absolute()}"
 
         sys.argv = [sys.argv[0], "operaton.tasks.main:app"]
@@ -123,18 +150,18 @@ if HAS_CLI:
             with tempfile.NamedTemporaryFile(mode="w+", delete=True) as temp_file:
                 temp_file.writelines(
                     [
-                        f"ENGINE_REST_BASE_URL={base_url}\n",
-                        f"ENGINE_REST_AUTHORIZATION={authorization or ''}\n",
-                        f"OAUTH2_CLIENT_ID={oauth2_client_id or ''}\n",
-                        f"OAUTH2_CLIENT_SECRET={oauth2_client_secret or ''}\n",
-                        f"OAUTH2_TOKEN_URL={oauth2_token_url or ''}\n",
-                        f"OAUTH2_SCOPES={oauth2_scopes or ''}\n",
-                        f"ENGINE_REST_TIMEOUT_SECONDS={timeout}\n",
-                        f"ENGINE_REST_POLL_TTL_SECONDS={poll_ttl}\n",
-                        f"ENGINE_REST_LOCK_TTL_SECONDS={lock_ttl}\n",
-                        f"TASKS_WORKER_ID={worker_id}\n",
-                        f"TASKS_MODULE={module}\n",
-                        f"LOG_LEVEL={log_level}",
+                        f"ENGINE_REST_BASE_URL={settings.ENGINE_REST_BASE_URL}\n",
+                        f"ENGINE_REST_AUTHORIZATION={settings.ENGINE_REST_AUTHORIZATION or ''}\n",
+                        f"OAUTH2_CLIENT_ID={settings.OAUTH2_CLIENT_ID or ''}\n",
+                        f"OAUTH2_CLIENT_SECRET={settings.OAUTH2_CLIENT_SECRET or ''}\n",
+                        f"OAUTH2_TOKEN_URL={settings.OAUTH2_TOKEN_URL or ''}\n",
+                        f"OAUTH2_SCOPES={settings.OAUTH2_SCOPES or ''}\n",
+                        f"ENGINE_REST_TIMEOUT_SECONDS={settings.ENGINE_REST_TIMEOUT_SECONDS}\n",
+                        f"ENGINE_REST_POLL_TTL_SECONDS={settings.ENGINE_REST_POLL_TTL_SECONDS}\n",
+                        f"ENGINE_REST_LOCK_TTL_SECONDS={settings.ENGINE_REST_LOCK_TTL_SECONDS}\n",
+                        f"TASKS_WORKER_ID={settings.TASKS_WORKER_ID}\n",
+                        f"TASKS_MODULE={settings.TASKS_MODULE}\n",
+                        f"LOG_LEVEL={settings.LOG_LEVEL}",
                     ]
                 )
                 temp_file.flush()

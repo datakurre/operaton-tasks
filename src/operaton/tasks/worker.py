@@ -40,11 +40,21 @@ def format_error_message(error: Exception) -> str:
 
     # Handle 401 authentication errors
     if "401" in error_str or "Unauthorized" in error_str:
+        from operaton.tasks.oauth2 import token_manager  # avoid circular import
+
+        auth_method: str
+        if settings.ENGINE_REST_AUTHORIZATION:
+            auth_method = "ENGINE_REST_AUTHORIZATION (Basic/token)"
+        elif token_manager.is_configured:
+            auth_method = "OAuth2 client credentials"
+        else:
+            auth_method = "none configured"
         return (
             f"{error_str}\n"
             "→ Authentication failed. Check your configuration:\n"
             f"  - ENGINE_REST_BASE_URL: {settings.ENGINE_REST_BASE_URL}\n"
-            f"  - ENGINE_REST_AUTHORIZATION: {'set' if settings.ENGINE_REST_AUTHORIZATION else 'not set'}\n"
+            f"  - AUTH_METHOD: {auth_method}\n"
+            f"  - OAUTH2_TOKEN_URL: {settings.OAUTH2_TOKEN_URL or 'not set'}\n"
             "  - Ensure the Operaton engine is running and accessible"
         )
 

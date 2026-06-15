@@ -13,6 +13,7 @@ inputs:
         follows: nixpkgs
   devenv-module-operaton:
     url: gitlab:vasara-bpm/devenv-module-operaton/oauth2
+strictPorts: true
 profile: shell
 imports:
   - devenv-module-operaton/module.nix

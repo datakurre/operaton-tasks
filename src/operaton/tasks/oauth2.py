@@ -1,12 +1,18 @@
 """OAuth2 client credentials token manager."""
 
 from operaton.tasks.config import settings
+from operaton.tasks.config import stream_handler
 from typing import Any
 from typing import Dict
 from typing import Optional
 import aiohttp
 import asyncio
+import logging
 import time
+
+
+logger = logging.getLogger(__name__)
+logger.addHandler(stream_handler)
 
 
 class OAuth2TokenManager:
@@ -45,6 +51,7 @@ class OAuth2TokenManager:
         if not (token_url and client_id and client_secret):
             raise RuntimeError("OAuth2 client credentials settings are incomplete")
 
+        logger.debug("Fetching OAuth2 token from %s for client %s", token_url, client_id)
         data: Dict[str, str] = {
             "grant_type": "client_credentials",
             "client_id": client_id,

@@ -28,4 +28,5 @@ async def handler(task: LockedExternalTaskDto) -> ExternalTaskComplete:
     )
 
 
-operaton.tasks.serve()
+if __name__ == "__main__":
+    operaton.tasks.serve()
