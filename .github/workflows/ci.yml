@@ -5,10 +5,10 @@ on:
     branches:
       - main
       - master
+    tags:
+      - "v*"
   pull_request:
   workflow_dispatch:
-  tags:
-    - "v*"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -31,11 +31,20 @@ jobs:
       - name: Setup Nix Cache
         uses: DeterminateSystems/magic-nix-cache-action@v7
 
+      - name: Setup Cachix
+        uses: cachix/cachix-action@v15
+        with:
+          name: datakurre
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+
+      - name: Install devenv
+        run: nix profile add nixpkgs#devenv
+
       - name: Show devenv info
-        run: nix flake show
+        run: devenv info
 
       - name: Run linting & type checks
-        run: nix develop --no-update-lock-file --command make check
+        run: devenv shell -- make check
 
   test:
     name: Tests
@@ -53,9 +62,23 @@ jobs:
       - name: Setup Nix Cache
         uses: DeterminateSystems/magic-nix-cache-action@v7
 
+      - name: Setup Cachix
+        uses: cachix/cachix-action@v15
+        with:
+          name: datakurre
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+
+      - name: Install devenv
+        run: nix profile add nixpkgs#devenv
+
       - name: Run integration tests
-        run: nix develop --no-update-lock-file --command make devenv-test
+        run: make devenv-test
         timeout-minutes: 15
+
+      - name: Push to Cachix
+        if: always()
+        run: |
+          devenv shell -- bash -c 'nix-store -qR --include-outputs /nix/store/*-devenv-shell* 2>/dev/null | cachix push datakurre || true'
 
       - name: Upload coverage reports
         if: always()
