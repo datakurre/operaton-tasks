@@ -74,4 +74,5 @@ in
   profiles.shell.module = {
     imports = [ shell ];
   };
+  cachix.pull = [ "vasara-bpm" ];
 }
