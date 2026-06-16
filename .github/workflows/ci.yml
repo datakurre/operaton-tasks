@@ -16,60 +16,55 @@ concurrency:
 
 jobs:
   check:
-    name: Lint & Type Check
+    name: Check
     runs-on: ubuntu-latest
-    env:
-      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Nix
         uses: cachix/install-nix-action@v31
         with:
-          nix_path: nixpkgs=channel:nixos-unstable
+          nix_path: nixpkgs=channel:nixos-26.05
 
-      - name: Setup Cachix
-        if: ${{ env.CACHIX_AUTH_TOKEN != '' }}
-        uses: cachix/cachix-action@v15
+      - name: Setup Cachix (read-only)
+        uses: cachix/cachix-action@v17
         with:
           name: vasara-bpm
-          authToken: ${{ env.CACHIX_AUTH_TOKEN }}
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+
+      - name: Install devenv
+        run: nix profile add github:cachix/devenv/v2.1.2 --accept-flake-config
 
       - name: Run linting & type checks
-        run: nix run github:cachix/devenv/latest -- shell --no-eval-cache -- make check
+        run: devenv shell make check
 
   test:
     name: Tests
     runs-on: ubuntu-latest
-    env:
-      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Nix
         uses: cachix/install-nix-action@v31
         with:
-          nix_path: nixpkgs=channel:nixos-unstable
+          nix_path: nixpkgs=channel:nixos-26.05
 
-      - name: Setup Cachix
-        if: ${{ env.CACHIX_AUTH_TOKEN != '' }}
-        uses: cachix/cachix-action@v15
+      - name: Setup Cachix (read-only)
+        uses: cachix/cachix-action@v17
         with:
           name: vasara-bpm
-          authToken: ${{ env.CACHIX_AUTH_TOKEN }}
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+
+      - name: Install devenv
+        run: nix profile add github:cachix/devenv/v2.1.2 --accept-flake-config
 
       - name: Run integration tests
-        run: nix run github:cachix/devenv/latest -- shell --no-eval-cache -- make devenv-test
+        run: devenv shell make devenv-test
         timeout-minutes: 15
 
-      - name: Push to Cachix
-        if: ${{ always() && env.CACHIX_AUTH_TOKEN != '' }}
-        run: |
-          nix run github:cachix/devenv/latest -- shell --no-eval-cache -- bash -c 'nix-store -qR --include-outputs /nix/store/*-devenv-shell* 2>/dev/null | cachix push vasara-bpm || true'
-
       - name: Upload coverage reports
-        if: always()
-        uses: actions/upload-artifact@v4
+        if: success()
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-reports
           path: htmlcov/
