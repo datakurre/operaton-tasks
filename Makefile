@@ -18,12 +18,12 @@ env:  ## Build and link the Python virtual environment
 check:  ## Run static analysis checks
 	treefmt --fail-on-change
 	flake8 src tests
-	MYPYPATH=$(PWD)/stubs mypy --show-error-codes --strict src
+	MYPYPATH=$(PWD)/stubs mypy --show-error-codes --strict -p operaton.tasks
 	MYPYPATH=$(PWD)/stubs mypy --show-error-codes --follow-imports=silent --check-untyped-defs --disable-error-code attr-defined --disable-error-code arg-type --disable-error-code return-value --disable-error-code var-annotated --disable-error-code misc tests
 
 clean:  ## Remove build artifacts and temporary files
 	devenv gc
-	$(RM) -r env htmlcov .devenv
+	$(RM) -r env htmlcov
 
 devenv-up:  ## Start background services
 	devenv processes up -d

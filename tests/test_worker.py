@@ -839,6 +839,22 @@ def test_format_error_message_for_401_errors_with_no_auth(monkeypatch: Any) -> N
     assert "AUTH_METHOD: none configured" in formatted
 
 
+def test_format_error_message_for_401_errors_uses_oauth2(monkeypatch: Any) -> None:
+    """Test format_error_message reports OAuth2 when client credentials are configured."""
+    monkeypatch.setattr(worker_module.settings, "ENGINE_REST_AUTHORIZATION", None)
+    monkeypatch.setattr(worker_module.settings, "OAUTH2_CLIENT_ID", "client-id")
+    monkeypatch.setattr(
+        worker_module.settings, "OAUTH2_CLIENT_SECRET", "client-secret"
+    )
+    monkeypatch.setattr(
+        worker_module.settings, "OAUTH2_TOKEN_URL", "https://auth.example/token"
+    )
+
+    formatted = worker_module.format_error_message(RuntimeError("401 Unauthorized"))
+
+    assert "AUTH_METHOD: OAuth2 client credentials" in formatted
+
+
 def test_unlock_all_raises_on_401_response(monkeypatch: Any) -> None:
     """Test unlock_all raises RuntimeError on 401 response."""
     async def fake_request_with_auth_retry(
