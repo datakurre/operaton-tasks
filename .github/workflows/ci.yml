@@ -22,29 +22,19 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v13
+        uses: cachix/install-nix-action@v31
         with:
-          logger: pretty
-          log-directives: nix_installer=debug
-          diagnostic-endpoint: ""
-
-      - name: Setup Nix Cache
-        uses: DeterminateSystems/magic-nix-cache-action@v7
+          nix_path: nixpkgs=channel:nixos-unstable
 
       - name: Setup Cachix
+        if: ${{ secrets.CACHIX_AUTH_TOKEN != '' }}
         uses: cachix/cachix-action@v15
         with:
           name: datakurre
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
-      - name: Install devenv
-        run: nix profile add nixpkgs#devenv
-
-      - name: Show devenv info
-        run: devenv info
-
       - name: Run linting & type checks
-        run: devenv shell -- make check
+        run: nix run github:cachix/devenv/latest -- shell --no-eval-cache -- make check
 
   test:
     name: Tests
@@ -53,32 +43,25 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v13
+        uses: cachix/install-nix-action@v31
         with:
-          logger: pretty
-          log-directives: nix_installer=debug
-          diagnostic-endpoint: ""
-
-      - name: Setup Nix Cache
-        uses: DeterminateSystems/magic-nix-cache-action@v7
+          nix_path: nixpkgs=channel:nixos-unstable
 
       - name: Setup Cachix
+        if: ${{ secrets.CACHIX_AUTH_TOKEN != '' }}
         uses: cachix/cachix-action@v15
         with:
           name: datakurre
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
-      - name: Install devenv
-        run: nix profile add nixpkgs#devenv
-
       - name: Run integration tests
-        run: make devenv-test
+        run: nix run github:cachix/devenv/latest -- shell --no-eval-cache -- make devenv-test
         timeout-minutes: 15
 
       - name: Push to Cachix
-        if: always()
+        if: ${{ always() && secrets.CACHIX_AUTH_TOKEN != '' }}
         run: |
-          devenv shell -- bash -c 'nix-store -qR --include-outputs /nix/store/*-devenv-shell* 2>/dev/null | cachix push datakurre || true'
+          nix run github:cachix/devenv/latest -- shell --no-eval-cache -- bash -c 'nix-store -qR --include-outputs /nix/store/*-devenv-shell* 2>/dev/null | cachix push datakurre || true'
 
       - name: Upload coverage reports
         if: always()
