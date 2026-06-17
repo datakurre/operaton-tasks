@@ -84,6 +84,8 @@ Main environment variables:
 - TASKS_WORKER_ID (default: operaton-tasks-client)
 - TASKS_HEARTBEAT_TOPIC (default: operaton.tasks.heartbeat)
 - TASKS_MODULE (used by CLI/app startup to load your handlers module)
+- TASKS_LIMIT (default: 0, stop after processing this many tasks)
+- TASKS_RUN_TIMEOUT_SECONDS (default: 0, exit after this many seconds)
 - LOG_LEVEL (default: DEBUG)
 
 ## Usage as standalone worker (CLI)
@@ -146,6 +148,16 @@ operaton-tasks serve ./my_tasks.py \
 ```
 
 Note: arguments after -- are passed through to uvicorn.
+
+If you want the CLI to process a bounded number of tasks and then exit, pass the
+worker controls directly:
+
+```bash
+operaton-tasks serve ./my_tasks.py --limit 10 --run-timeout 60
+```
+
+When either `--limit` or `--run-timeout` is set, the CLI loads the handler module,
+runs the worker in one-shot mode, and exits when the limit or timeout is reached.
 
 ## Usage as a library/dependency
 
