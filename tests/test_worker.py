@@ -901,3 +901,256 @@ def test_unlock_all_raises_on_non_200_non_401_response(monkeypatch: Any) -> None
 
     with pytest.raises(HTTPException):
         asyncio.run(worker_module.unlock_all(object()))
+
+
+def test_fetch_and_lock_and_complete_raises_limit_reached_after_complete(
+    monkeypatch: Any,
+) -> None:
+    created_tasks: Dict[str, FakeTask] = {}
+    wait_calls = 0
+    complete_calls: List[str] = []
+
+    async def handler(_: LockedExternalTaskDto) -> ExternalTaskComplete:
+        return _complete_result()
+
+    handlers = {"topic-a": ExternalTaskTopic(handler=handler, localVariables=True)}
+
+    async def fake_unlock_all(http: object) -> None:
+        return None
+
+    async def fake_request_with_auth_retry(
+        http: object,
+        method: str,
+        url: str,
+        **kwargs: Any,
+    ) -> FakeClientResponse:
+        return FakeClientResponse(204)
+
+    async def fake_verify_response_status(
+        response: FakeClientResponse,
+        status: tuple[int, ...],
+    ) -> FakeClientResponse:
+        return response
+
+    async def fake_complete_task(
+        http: object, result: ExternalTaskComplete
+    ) -> ExternalTaskComplete:
+        complete_calls.append(result.task.id or "")
+        return result
+
+    def fake_create_task(coro: Any, name: str) -> FakeTask:
+        coro.close()
+        if name == "fetchAndLock":
+            task = FakeTask(
+                name,
+                FakeClientResponse(
+                    200,
+                    payload=[
+                        {
+                            "id": "task-1",
+                            "topicName": "topic-a",
+                            "workerId": "worker-id",
+                        }
+                    ],
+                ),
+            )
+        else:
+            task = FakeTask(name, _complete_result(task_id="task-1"))
+        created_tasks[name] = task
+        return task
+
+    async def fake_wait(
+        pending: Set[Any],
+        return_when: Any,
+    ) -> tuple[Set[Any], Set[Any]]:
+        nonlocal wait_calls
+        wait_calls += 1
+        if wait_calls == 1:
+            return {created_tasks["fetchAndLock"]}, set()
+        return {created_tasks["topic-a:task-1"]}, set()
+
+    monkeypatch.setattr(worker_module, "unlock_all", fake_unlock_all)
+    monkeypatch.setattr(
+        worker_module, "request_with_auth_retry", fake_request_with_auth_retry
+    )
+    monkeypatch.setattr(
+        worker_module, "verify_response_status", fake_verify_response_status
+    )
+    monkeypatch.setattr(worker_module, "complete_task", fake_complete_task)
+    monkeypatch.setattr(worker_module, "ClientResponse", FakeClientResponse)
+    monkeypatch.setattr(worker_module.asyncio, "create_task", fake_create_task)
+    monkeypatch.setattr(worker_module.asyncio, "wait", fake_wait)
+
+    with pytest.raises(worker_module.LimitReached):
+        asyncio.run(worker_module.fetch_and_lock_and_complete(object(), handlers, limit=1))
+
+    assert complete_calls == ["task-1"]
+
+
+def test_fetch_and_lock_and_complete_raises_limit_reached_after_failure(
+    monkeypatch: Any,
+) -> None:
+    created_tasks: Dict[str, FakeTask] = {}
+    wait_calls = 0
+    fail_calls: List[str] = []
+
+    async def handler(_: LockedExternalTaskDto) -> ExternalTaskComplete:
+        return _complete_result()
+
+    handlers = {"topic-a": ExternalTaskTopic(handler=handler, localVariables=True)}
+
+    async def fake_unlock_all(http: object) -> None:
+        return None
+
+    async def fake_request_with_auth_retry(
+        http: object,
+        method: str,
+        url: str,
+        **kwargs: Any,
+    ) -> FakeClientResponse:
+        return FakeClientResponse(204)
+
+    async def fake_verify_response_status(
+        response: FakeClientResponse,
+        status: tuple[int, ...],
+    ) -> FakeClientResponse:
+        return response
+
+    async def fake_fail_task(
+        http: object, result: ExternalTaskFailure
+    ) -> ExternalTaskFailure:
+        fail_calls.append(result.task.id or "")
+        return result
+
+    def fake_create_task(coro: Any, name: str) -> FakeTask:
+        coro.close()
+        if name == "fetchAndLock":
+            task = FakeTask(
+                name,
+                FakeClientResponse(
+                    200,
+                    payload=[
+                        {
+                            "id": "task-1",
+                            "topicName": "topic-a",
+                            "workerId": "worker-id",
+                        }
+                    ],
+                ),
+            )
+        else:
+            task = FakeTask(name, _failure_result(task_id="task-1"))
+        created_tasks[name] = task
+        return task
+
+    async def fake_wait(
+        pending: Set[Any],
+        return_when: Any,
+    ) -> tuple[Set[Any], Set[Any]]:
+        nonlocal wait_calls
+        wait_calls += 1
+        if wait_calls == 1:
+            return {created_tasks["fetchAndLock"]}, set()
+        return {created_tasks["topic-a:task-1"]}, set()
+
+    monkeypatch.setattr(worker_module, "unlock_all", fake_unlock_all)
+    monkeypatch.setattr(
+        worker_module, "request_with_auth_retry", fake_request_with_auth_retry
+    )
+    monkeypatch.setattr(
+        worker_module, "verify_response_status", fake_verify_response_status
+    )
+    monkeypatch.setattr(worker_module, "fail_task", fake_fail_task)
+    monkeypatch.setattr(worker_module, "ClientResponse", FakeClientResponse)
+    monkeypatch.setattr(worker_module.asyncio, "create_task", fake_create_task)
+    monkeypatch.setattr(worker_module.asyncio, "wait", fake_wait)
+
+    with pytest.raises(worker_module.LimitReached):
+        asyncio.run(worker_module.fetch_and_lock_and_complete(object(), handlers, limit=1))
+
+    assert fail_calls == ["task-1"]
+
+
+def test_fetch_and_lock_and_complete_noop_does_not_count_toward_limit(
+    monkeypatch: Any,
+) -> None:
+    created_tasks: Dict[str, FakeTask] = {}
+    wait_calls = 0
+
+    async def handler(_: LockedExternalTaskDto) -> ExternalTaskComplete:
+        return _complete_result()
+
+    handlers = {"topic.heartbeat": ExternalTaskTopic(handler=handler, localVariables=True)}
+
+    async def fake_unlock_all(http: object) -> None:
+        return None
+
+    async def fake_request_with_auth_retry(
+        http: object,
+        method: str,
+        url: str,
+        **kwargs: Any,
+    ) -> FakeClientResponse:
+        return FakeClientResponse(204)
+
+    async def fake_verify_response_status(
+        response: FakeClientResponse,
+        status: tuple[int, ...],
+    ) -> FakeClientResponse:
+        return response
+
+    def fake_create_task(coro: Any, name: str) -> FakeTask:
+        coro.close()
+        if name == "fetchAndLock":
+            task = FakeTask(
+                name,
+                FakeClientResponse(
+                    200,
+                    payload=[
+                        {
+                            "id": "task-1",
+                            "topicName": "topic.heartbeat",
+                            "workerId": "worker-id",
+                        }
+                    ],
+                ),
+            )
+        else:
+            task = FakeTask(
+                name,
+                ExternalTaskComplete(
+                    task=_locked_task(topic="topic.heartbeat", task_id="task-1"),
+                    response=NoOp(),
+                ),
+            )
+        created_tasks[name] = task
+        return task
+
+    async def fake_wait(
+        pending: Set[Any],
+        return_when: Any,
+    ) -> tuple[Set[Any], Set[Any]]:
+        nonlocal wait_calls
+        wait_calls += 1
+        if wait_calls == 1:
+            return {created_tasks["fetchAndLock"]}, set()
+        if wait_calls == 2:
+            return {created_tasks["topic.heartbeat:task-1"]}, set()
+        raise WorkerStop()
+
+    monkeypatch.setattr(worker_module, "unlock_all", fake_unlock_all)
+    monkeypatch.setattr(
+        worker_module, "request_with_auth_retry", fake_request_with_auth_retry
+    )
+    monkeypatch.setattr(
+        worker_module, "verify_response_status", fake_verify_response_status
+    )
+    monkeypatch.setattr(worker_module, "ClientResponse", FakeClientResponse)
+    monkeypatch.setattr(worker_module.asyncio, "create_task", fake_create_task)
+    monkeypatch.setattr(worker_module.asyncio, "wait", fake_wait)
+
+    # limit=1 but NoOp tasks should not count; WorkerStop is raised before LimitReached
+    with pytest.raises(WorkerStop):
+        asyncio.run(
+            worker_module.fetch_and_lock_and_complete(object(), handlers, limit=1)
+        )

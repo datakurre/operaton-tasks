@@ -351,6 +351,8 @@ def test_main_cli_serve_sets_proxy_headers(monkeypatch: Any) -> None:
         worker_id="worker-2",
         log_level="DEBUG",
         args=["--workers", "1"],
+        limit=None,
+        run_timeout=None,
     )
 
     assert calls == ["uvicorn"]
@@ -417,6 +419,8 @@ def test_main_cli_serve_writes_reload_env_file(monkeypatch: Any) -> None:
         worker_id="worker-3",
         log_level="INFO",
         args=["--reload"],
+        limit=None,
+        run_timeout=None,
     )
 
     assert calls == ["uvicorn"]
@@ -452,6 +456,8 @@ def test_main_cli_serve_accepts_no_extra_args(monkeypatch: Any) -> None:
         worker_id=None,
         log_level=None,
         args=None,
+        limit=None,
+        run_timeout=None,
     )
 
     assert main_module.sys.argv == ["operaton-tasks", "operaton.tasks.main:app"]
@@ -495,3 +501,220 @@ def test_main_exits_without_cli(monkeypatch: Any) -> None:
 
     assert error.value.code == 1
     assert calls == [1]
+
+
+class FakeSessionContext:
+    async def __aenter__(self) -> object:
+        return object()
+
+    async def __aexit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
+        return None
+
+
+def test_run_worker_once_returns_0_on_limit_reached(monkeypatch: Any) -> None:
+    async def fake_fetch(*args: Any, **kwargs: Any) -> None:
+        raise main_module.LimitReached(1)
+
+    monkeypatch.setattr(main_module, "operaton_session", FakeSessionContext)
+    monkeypatch.setattr(main_module, "fetch_and_lock_and_complete", fake_fetch)
+
+    result = asyncio.run(main_module.run_worker_once(limit=1))
+
+    assert result == 0
+
+
+def test_run_worker_once_returns_0_on_timeout_without_limit(monkeypatch: Any) -> None:
+    async def fake_fetch(*args: Any, **kwargs: Any) -> None:
+        await asyncio.sleep(9999)
+
+    async def fake_wait_for(coro: Any, timeout: float) -> None:
+        coro.close()
+        raise asyncio.TimeoutError()
+
+    monkeypatch.setattr(main_module, "operaton_session", FakeSessionContext)
+    monkeypatch.setattr(main_module, "fetch_and_lock_and_complete", fake_fetch)
+    monkeypatch.setattr(main_module.asyncio, "wait_for", fake_wait_for)
+
+    result = asyncio.run(main_module.run_worker_once(limit=0, timeout_seconds=1))
+
+    assert result == 0
+
+
+def test_run_worker_once_returns_1_on_timeout_with_limit(monkeypatch: Any) -> None:
+    async def fake_fetch(*args: Any, **kwargs: Any) -> None:
+        await asyncio.sleep(9999)
+
+    async def fake_wait_for(coro: Any, timeout: float) -> None:
+        coro.close()
+        raise asyncio.TimeoutError()
+
+    monkeypatch.setattr(main_module, "operaton_session", FakeSessionContext)
+    monkeypatch.setattr(main_module, "fetch_and_lock_and_complete", fake_fetch)
+    monkeypatch.setattr(main_module.asyncio, "wait_for", fake_wait_for)
+
+    result = asyncio.run(main_module.run_worker_once(limit=1, timeout_seconds=5))
+
+    assert result == 1
+
+
+def test_run_worker_once_returns_1_on_connection_error(monkeypatch: Any) -> None:
+    async def fake_fetch(*args: Any, **kwargs: Any) -> None:
+        raise RuntimeError("connection refused")
+
+    monkeypatch.setattr(main_module, "operaton_session", FakeSessionContext)
+    monkeypatch.setattr(main_module, "fetch_and_lock_and_complete", fake_fetch)
+
+    result = asyncio.run(main_module.run_worker_once())
+
+    assert result == 1
+
+
+def test_run_worker_once_returns_0_when_fetch_completes_normally(
+    monkeypatch: Any,
+) -> None:
+    async def fake_fetch(*args: Any, **kwargs: Any) -> None:
+        return None
+
+    monkeypatch.setattr(main_module, "operaton_session", FakeSessionContext)
+    monkeypatch.setattr(main_module, "fetch_and_lock_and_complete", fake_fetch)
+
+    result = asyncio.run(main_module.run_worker_once())
+
+    assert result == 0
+
+
+def test_main_cli_serve_limit_exits_with_worker_once(monkeypatch: Any) -> None:
+    callback = main_module.cli.registered_commands[0].callback
+    loader = FakeLoader()
+    exit_codes: List[int] = []
+
+    def fake_asyncio_run(coro: Any) -> int:
+        coro.close()
+        return 0
+
+    def fake_exit(code: int) -> None:
+        exit_codes.append(code)
+        raise SystemExit(code)
+
+    monkeypatch.setattr(
+        main_module.importlib.util,
+        "spec_from_file_location",
+        lambda *args: FakeSpec(loader),
+    )
+    monkeypatch.setattr(
+        main_module.importlib.util, "module_from_spec", lambda s: object()
+    )
+    monkeypatch.setattr(main_module.asyncio, "run", fake_asyncio_run)
+    monkeypatch.setattr(main_module, "exit", fake_exit, raising=False)
+    monkeypatch.setattr(main_module.sys, "argv", ["operaton-tasks"])
+
+    with pytest.raises(SystemExit):
+        callback(
+            module=Path("heartbeat.py"),
+            base_url=None,
+            authorization=None,
+            oauth2_client_id=None,
+            oauth2_client_secret=None,
+            oauth2_token_url=None,
+            oauth2_scopes=None,
+            timeout=None,
+            poll_ttl=None,
+            lock_ttl=None,
+            worker_id=None,
+            log_level=None,
+            args=None,
+            limit=1,
+            run_timeout=None,
+        )
+
+    assert exit_codes == [0]
+    assert loader.executed_module is not None
+
+
+def test_main_cli_serve_run_timeout_exits_with_worker_once(monkeypatch: Any) -> None:
+    callback = main_module.cli.registered_commands[0].callback
+    exit_codes: List[int] = []
+
+    def fake_asyncio_run(coro: Any) -> int:
+        coro.close()
+        return 1
+
+    def fake_exit(code: int) -> None:
+        exit_codes.append(code)
+        raise SystemExit(code)
+
+    monkeypatch.setattr(
+        main_module.importlib.util,
+        "spec_from_file_location",
+        lambda *args: None,
+    )
+    monkeypatch.setattr(main_module.asyncio, "run", fake_asyncio_run)
+    monkeypatch.setattr(main_module, "exit", fake_exit, raising=False)
+    monkeypatch.setattr(main_module.sys, "argv", ["operaton-tasks"])
+
+    with pytest.raises(SystemExit):
+        callback(
+            module=Path("heartbeat.py"),
+            base_url=None,
+            authorization=None,
+            oauth2_client_id=None,
+            oauth2_client_secret=None,
+            oauth2_token_url=None,
+            oauth2_scopes=None,
+            timeout=None,
+            poll_ttl=None,
+            lock_ttl=None,
+            worker_id=None,
+            log_level=None,
+            args=None,
+            limit=None,
+            run_timeout=30,
+        )
+
+    assert exit_codes == [1]
+
+
+def test_main_cli_serve_limit_handles_spec_with_no_loader(monkeypatch: Any) -> None:
+    callback = main_module.cli.registered_commands[0].callback
+    exit_codes: List[int] = []
+
+    def fake_asyncio_run(coro: Any) -> int:
+        coro.close()
+        return 0
+
+    def fake_exit(code: int) -> None:
+        exit_codes.append(code)
+        raise SystemExit(code)
+
+    monkeypatch.setattr(
+        main_module.importlib.util,
+        "spec_from_file_location",
+        lambda *args: FakeSpec(loader=None),
+    )
+    monkeypatch.setattr(
+        main_module.importlib.util, "module_from_spec", lambda s: object()
+    )
+    monkeypatch.setattr(main_module.asyncio, "run", fake_asyncio_run)
+    monkeypatch.setattr(main_module, "exit", fake_exit, raising=False)
+    monkeypatch.setattr(main_module.sys, "argv", ["operaton-tasks"])
+
+    with pytest.raises(SystemExit):
+        callback(
+            module=Path("heartbeat.py"),
+            base_url=None,
+            authorization=None,
+            oauth2_client_id=None,
+            oauth2_client_secret=None,
+            oauth2_token_url=None,
+            oauth2_scopes=None,
+            timeout=None,
+            poll_ttl=None,
+            lock_ttl=None,
+            worker_id=None,
+            log_level=None,
+            args=None,
+            limit=1,
+            run_timeout=None,
+        )
+
+    assert exit_codes == [0]

@@ -22,7 +22,7 @@ let
         realms.operaton = {
           path = "./fixture/keycloak/operaton-realm.json";
           import = true;
-          export = true;
+          # export = true;  # breaks devenv test when enabled, because it never completes
         };
       };
 
@@ -66,6 +66,10 @@ let
 
       enterTest = ''
         wait_for_port 8080 60
+        wait_for_port 8081 60
+        make test
+        curl -sf -X POST -H "Content-Type: application/json" -d '{}' http://localhost:8080/engine-rest/process-definition/key/operaton-tasks-hello-world/start
+        operaton-tasks serve examples/hello_world.py --limit 1 --run-timeout 60
       '';
 
     };

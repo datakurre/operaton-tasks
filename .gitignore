@@ -4,6 +4,7 @@
 .coverage
 .devenv*
 .env
+.venv/
 .idea/
 .devcontainer.json
 .mypy_cache/

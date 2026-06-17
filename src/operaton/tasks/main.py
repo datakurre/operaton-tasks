@@ -7,7 +7,11 @@ from operaton.tasks.config import router
 from operaton.tasks.config import settings
 from operaton.tasks.config import stream_handler
 from operaton.tasks.healthz import healthz  # noqa  # keep import for registration
+from operaton.tasks.utils import operaton_session
 from operaton.tasks.worker import external_task_worker
+from operaton.tasks.worker import fetch_and_lock_and_complete
+from operaton.tasks.worker import format_error_message
+from operaton.tasks.worker import LimitReached
 from pathlib import Path
 from starlette.requests import Request
 from starlette.responses import Response
@@ -69,6 +73,25 @@ app = FastAPI(
 app.include_router(router)
 
 
+async def run_worker_once(limit: int = 0, timeout_seconds: int = 0) -> int:
+    """Run worker until limit reached or timeout. Returns exit code (0=success, 1=failure)."""
+    try:
+        async with operaton_session() as http:
+            coro = fetch_and_lock_and_complete(http, handlers, limit=limit)
+            if timeout_seconds > 0:
+                await asyncio.wait_for(coro, timeout=float(timeout_seconds))
+            else:
+                await coro
+    except LimitReached:
+        return 0
+    except asyncio.TimeoutError:
+        return 0 if limit == 0 else 1
+    except Exception as e:  # pylint: disable=W0703
+        logger.exception("Worker exited with error: %s", format_error_message(e))
+        return 1
+    return 0
+
+
 @app.middleware("http")
 async def cache_headers(
     request: Request, call_next: Callable[[Request], Awaitable[Response]]
@@ -115,6 +138,8 @@ if HAS_CLI:
             None, help="Worker ID sent to Operaton"
         ),
         log_level: Optional[str] = typer.Option(None, help="Logging level"),
+        limit: Optional[int] = typer.Option(None, help="Max tasks to process before exit (0=unlimited)"),
+        run_timeout: Optional[int] = typer.Option(None, help="Exit after N seconds (0=no timeout)"),
     ) -> None:
         """Run External Service Task Worker."""
         if base_url is not None:
@@ -140,6 +165,22 @@ if HAS_CLI:
         if log_level is not None:
             settings.LOG_LEVEL = log_level
         settings.TASKS_MODULE = f"{module.absolute()}"
+        if run_timeout is not None:
+            settings.TASKS_RUN_TIMEOUT_SECONDS = run_timeout
+        if limit is not None:
+            settings.TASKS_LIMIT = limit
+
+        if settings.TASKS_LIMIT > 0 or settings.TASKS_RUN_TIMEOUT_SECONDS > 0:
+            _hash = hashlib.sha256(settings.TASKS_MODULE.encode("utf-8")).hexdigest()
+            _spec = importlib.util.spec_from_file_location(_hash, settings.TASKS_MODULE)
+            if _spec:
+                _mod = importlib.util.module_from_spec(_spec)
+                if _spec.loader:
+                    _spec.loader.exec_module(_mod)
+            exit(asyncio.run(run_worker_once(
+                limit=settings.TASKS_LIMIT,
+                timeout_seconds=settings.TASKS_RUN_TIMEOUT_SECONDS,
+            )))
 
         sys.argv = [sys.argv[0], "operaton.tasks.main:app"]
         if args and "--no-proxy-headers" not in args:

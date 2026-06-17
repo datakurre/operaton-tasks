@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     TASKS_HEARTBEAT_TOPIC: str = "operaton.tasks.heartbeat"
     TASKS_WORKER_ID: str = "operaton-tasks-client"
     TASKS_MODULE: Optional[str] = None
+    TASKS_LIMIT: int = 0
+    TASKS_RUN_TIMEOUT_SECONDS: int = 0
 
     LOG_LEVEL: str = "DEBUG"
 

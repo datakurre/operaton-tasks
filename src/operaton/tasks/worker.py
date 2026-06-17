@@ -29,6 +29,10 @@ import random
 import traceback
 
 
+class LimitReached(Exception):
+    """Raised when the configured task limit has been reached."""
+
+
 logger = logging.getLogger(__name__)
 logger.addHandler(stream_handler)
 logger.setLevel(settings.LOG_LEVEL)
@@ -229,6 +233,7 @@ def poll_topics(
 async def fetch_and_lock_and_complete(
     http: ClientSession,
     handlers: Dict[str, ExternalTaskTopic],
+    limit: int = 0,
 ) -> None:
     """Poll and process external task until connection fails."""
 
@@ -257,6 +262,7 @@ async def fetch_and_lock_and_complete(
         ],
     ] = set()
 
+    completed = 0
     while True:
         logger.debug(
             "Waiting for %s pending asyncio task%s: %s.",
@@ -313,6 +319,12 @@ async def fetch_and_lock_and_complete(
 
             if isinstance(result, ExternalTaskFailure):
                 result = await fail_task(http, result)
+
+            if isinstance(result, (ExternalTaskComplete, ExternalTaskFailure)):
+                if not (isinstance(result, ExternalTaskComplete) and isinstance(result.response, NoOp)):
+                    completed += 1
+                    if limit > 0 and completed >= limit:
+                        raise LimitReached(completed)
 
 
 async def external_task_worker(
