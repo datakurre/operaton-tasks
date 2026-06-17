@@ -1,6 +1,6 @@
 [project]
 name = "operaton-tasks"
-version = "1.0.0a6"
+version = "1.0b1"
 description = "External task library and client for Operaton"
 readme = "README.md"
 authors = [
@@ -31,6 +31,14 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/operaton"]
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+    ".env.example",
+    ".github/**",
+    ".gitlab-ci.yml",
+    "fixture/**",
+]
 
 [project.optional-dependencies]
 cli = [
