@@ -1,3 +1,9 @@
+## 1.0b3 (unreleased)
+
+
+- Nothing changed yet.
+
+
 ## 1.0b2 (unreleased)
 
 

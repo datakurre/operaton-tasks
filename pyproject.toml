@@ -1,6 +1,6 @@
 [project]
 name = "operaton-tasks"
-version = "1.0b2.dev0"
+version = "1.0b3.dev0"
 description = "External task library and client for Operaton"
 readme = "README.md"
 authors = [
