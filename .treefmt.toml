@@ -11,7 +11,3 @@ includes = ["*.py"]
 [formatter.isort]
 command = "isort"
 includes = ["*.py"]
-
-# [formatter.robotidy]
-# command = "robotidy"
-# includes = ["*.robot"]

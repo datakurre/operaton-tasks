@@ -47,6 +47,7 @@ dev = [
     "mypy>=1.13.0",
     "pytest-cov>=6.0.0",
     "pytest>=8.3.4",
+    "zest.releaser",
     "typer>=0.15.1",
     "uvicorn>=0.32.1",
 ]
@@ -59,3 +60,17 @@ line_length = 200
 lines_after_imports = 2
 lines_between_types = 0
 no_sections = true
+
+[tool.pytest.ini_options]
+addopts = "--cov=operaton.tasks --cov-branch --cov-report=term-missing --cov-fail-under=100"
+
+[tool.coverage.run]
+branch = true
+source = ["operaton.tasks"]
+omit = [
+    "src/operaton/tasks/types.py",
+]
+
+[tool.coverage.report]
+fail_under = 100
+show_missing = true

@@ -6,18 +6,19 @@ from asyncio import Lock
 from datetime import datetime
 from operaton.tasks.config import settings
 from operaton.tasks.config import stream_handler
+from operaton.tasks.runtime import ExternalTaskComplete
+from operaton.tasks.runtime import ExternalTaskFailure
+from operaton.tasks.runtime import ExternalTaskHandler
+from operaton.tasks.runtime import ExternalTaskTopic
+from operaton.tasks.runtime import NoOp
 from operaton.tasks.types import ExtendLockOnExternalTaskDto
 from operaton.tasks.types import ExternalTaskBpmnError
-from operaton.tasks.types import ExternalTaskComplete
-from operaton.tasks.types import ExternalTaskFailure
 from operaton.tasks.types import ExternalTaskFailureDto
-from operaton.tasks.types import ExternalTaskHandler
-from operaton.tasks.types import ExternalTaskTopic
 from operaton.tasks.types import FetchExternalTasksDto
 from operaton.tasks.types import FetchExternalTaskTopicDto
 from operaton.tasks.types import LockedExternalTaskDto
-from operaton.tasks.types import NoOp
 from operaton.tasks.utils import operaton_session
+from operaton.tasks.utils import request_with_auth_retry
 from operaton.tasks.utils import verify_response_status
 from typing import Dict
 from typing import Set
@@ -28,9 +29,40 @@ import random
 import traceback
 
 
+class LimitReached(Exception):
+    """Raised when the configured task limit has been reached."""
+
+
 logger = logging.getLogger(__name__)
 logger.addHandler(stream_handler)
 logger.setLevel(settings.LOG_LEVEL)
+
+
+def format_error_message(error: Exception) -> str:
+    """Format error message with helpful context for common issues."""
+    error_str = str(error)
+
+    # Handle 401 authentication errors
+    if "401" in error_str or "Unauthorized" in error_str:
+        from operaton.tasks.oauth2 import token_manager  # avoid circular import
+
+        auth_method: str
+        if settings.ENGINE_REST_AUTHORIZATION:
+            auth_method = "ENGINE_REST_AUTHORIZATION (Basic/token)"
+        elif token_manager.is_configured:
+            auth_method = "OAuth2 client credentials"
+        else:
+            auth_method = "none configured"
+        return (
+            f"{error_str}\n"
+            "→ Authentication failed. Check your configuration:\n"
+            f"  - ENGINE_REST_BASE_URL: {settings.ENGINE_REST_BASE_URL}\n"
+            f"  - AUTH_METHOD: {auth_method}\n"
+            f"  - OAUTH2_TOKEN_URL: {settings.OAUTH2_TOKEN_URL or 'not set'}\n"
+            "  - Ensure the Operaton engine is running and accessible"
+        )
+
+    return error_str
 
 
 async def executor(
@@ -73,7 +105,12 @@ async def complete_task(
         url = f"{settings.ENGINE_REST_BASE_URL}/external-task/{result.task.id}/complete"
 
     async with MUTEX:
-        response = await http.post(url, data=result.response.model_dump_json())
+        response = await request_with_auth_retry(
+            http,
+            "POST",
+            url,
+            data=result.response.model_dump_json(),
+        )
 
     if response.status not in [204, 404]:
         msg = await response.text()
@@ -112,7 +149,9 @@ async def extend_lock(
     for task in [t for t in pending if isinstance(t, asyncio.Task)]:
         task_id = task.get_name().rsplit(":", 1)[-1]
         url = f"{settings.ENGINE_REST_BASE_URL}/external-task/{task_id}/extendLock"
-        await http.post(
+        await request_with_auth_retry(
+            http,
+            "POST",
             url,
             data=ExtendLockOnExternalTaskDto(
                 workerId=settings.TASKS_WORKER_ID,
@@ -125,10 +164,20 @@ async def unlock_all(http: ClientSession) -> None:
     """Unlock all external tasks owned by this worker."""
     url = f"{settings.ENGINE_REST_BASE_URL}/external-task"
     params = {"workerId": settings.TASKS_WORKER_ID}
-    response = await (await http.get(url, params=params)).json()
+    resp = await request_with_auth_retry(http, "GET", url, params=params)
+
+    if resp.status == 401:
+        raise RuntimeError(
+            f"Unauthorized (401) to connect to Operaton engine at {url}. "
+            "Check ENGINE_REST_AUTHORIZATION credentials or ENGINE_REST_BASE_URL. "
+            f"Response: {await resp.text()}"
+        )
+
+    await verify_response_status(resp, status=(200,))
+    response = await resp.json()
     for task in response:
         url = f"{settings.ENGINE_REST_BASE_URL}/external-task/{task['id']}/unlock"
-        await http.post(url)
+        await request_with_auth_retry(http, "POST", url)
 
 
 async def fail_task(
@@ -141,13 +190,18 @@ async def fail_task(
     url = f"{settings.ENGINE_REST_BASE_URL}/external-task/{result.task.id}/failure"
 
     async with MUTEX:
-        response = await http.post(url, data=result.response.model_dump_json())
+        response = await request_with_auth_retry(
+            http,
+            "POST",
+            url,
+            data=result.response.model_dump_json(),
+        )
     if response.status not in [204, 404]:
         logger.error("Unexpected error: %s", await response.text())
 
     if response.status not in [404] and not result.response.retryTimeout:
         url = f"{settings.ENGINE_REST_BASE_URL}/external-task/{result.task.id}/unlock"
-        await http.post(url)
+        await request_with_auth_retry(http, "POST", url)
 
     logger.debug("Failed %s.", result.response)
 
@@ -179,6 +233,7 @@ def poll_topics(
 async def fetch_and_lock_and_complete(
     http: ClientSession,
     handlers: Dict[str, ExternalTaskTopic],
+    limit: int = 0,
 ) -> None:
     """Poll and process external task until connection fails."""
 
@@ -188,7 +243,12 @@ async def fetch_and_lock_and_complete(
     # Reset locks for current worker and workaround strange Operaton 7.14(?) long poll
     # issue where first poll was lost until the first lock timeout was reached
     await unlock_all(http)
-    await http.post(poll_url, data=poll_topics(handlers, 1000, 0, 1).model_dump_json())
+    await request_with_auth_retry(
+        http,
+        "POST",
+        poll_url,
+        data=poll_topics(handlers, 1000, 0, 1).model_dump_json(),
+    )
     await unlock_all(http)
 
     pending: Set[
@@ -202,6 +262,7 @@ async def fetch_and_lock_and_complete(
         ],
     ] = set()
 
+    completed = 0
     while True:
         logger.debug(
             "Waiting for %s pending asyncio task%s: %s.",
@@ -212,7 +273,12 @@ async def fetch_and_lock_and_complete(
 
         poll_task = (
             asyncio.create_task(
-                http.post(poll_url, data=poll_topics(handlers).model_dump_json()),
+                request_with_auth_retry(
+                    http,
+                    "POST",
+                    poll_url,
+                    data=poll_topics(handlers).model_dump_json(),
+                ),
                 name="fetchAndLock",
             )
             if poll_task is None or poll_task.done()
@@ -254,6 +320,12 @@ async def fetch_and_lock_and_complete(
             if isinstance(result, ExternalTaskFailure):
                 result = await fail_task(http, result)
 
+            if isinstance(result, (ExternalTaskComplete, ExternalTaskFailure)):
+                if not (isinstance(result, ExternalTaskComplete) and isinstance(result.response, NoOp)):
+                    completed += 1
+                    if limit > 0 and completed >= limit:
+                        raise LimitReached(completed)
+
 
 async def external_task_worker(
     handlers: Dict[str, ExternalTaskTopic],
@@ -265,13 +337,11 @@ async def external_task_worker(
         restart_dt = datetime.utcnow()
         # noinspection PyBroadException
         try:
-            async with operaton_session(
-                authorization=settings.ENGINE_REST_AUTHORIZATION,
-            ) as http:
+            async with operaton_session() as http:
                 await fetch_and_lock_and_complete(http, handlers)
         except Exception as e:  # pylint: disable=W0703
             logger.exception(
-                "External task worker disconnected: %s", getattr(e, "detail", str(e))
+                "External task worker disconnected: %s", format_error_message(e)
             )
 
         finally:

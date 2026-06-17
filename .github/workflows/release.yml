@@ -1,0 +1,89 @@
+name: Release to PyPI
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          nix_path: nixpkgs=channel:nixos-26.05
+
+      - name: Setup Cachix (read-only)
+        uses: cachix/cachix-action@v17
+        with:
+          name: vasara-bpm
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+
+      - name: Install devenv
+        run: nix profile add github:cachix/devenv/v2.1.2 --accept-flake-config
+
+      - name: Run linting & type checks
+        run: devenv shell make check
+
+  test:
+    name: Tests
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          nix_path: nixpkgs=channel:nixos-26.05
+
+      - name: Setup Cachix (read-only)
+        uses: cachix/cachix-action@v17
+        with:
+          name: vasara-bpm
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+
+      - name: Install devenv
+        run: nix profile add github:cachix/devenv/v2.1.2 --accept-flake-config
+
+      - name: Run integration tests
+        run: devenv shell make devenv-test
+        timeout-minutes: 30
+
+  build:
+    name: Build Package
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          nix_path: nixpkgs=channel:nixos-26.05
+
+      - name: Setup Cachix (write mode)
+        uses: cachix/cachix-action@v17
+        with:
+          name: vasara-bpm
+          authToken: ${{ env.CACHIX_AUTH_TOKEN }}
+
+      - name: Install devenv
+        run: nix profile add github:cachix/devenv/v2.1.2 --accept-flake-config
+
+      - name: Build wheel
+        run: devenv shell make build
+
+      - name: Upload build artifacts
+        if: success()
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: result/

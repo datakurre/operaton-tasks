@@ -2,6 +2,8 @@ from aiohttp import ClientResponse
 from contextlib import asynccontextmanager
 from fastapi.exceptions import HTTPException
 from operaton.tasks.config import settings
+from operaton.tasks.oauth2 import token_manager
+from typing import Any
 from typing import AsyncGenerator
 from typing import Dict
 from typing import Optional
@@ -13,24 +15,32 @@ import math
 import re
 
 
+async def resolve_authorization_header(
+    authorization: Optional[str] = None,
+) -> Optional[str]:
+    """Resolve Authorization header value using configured precedence."""
+    if authorization:
+        return authorization
+    if token_manager.is_configured:
+        token = await token_manager.get_token()
+        return f"Bearer {token}"
+    return settings.ENGINE_REST_AUTHORIZATION
+
+
 @asynccontextmanager
 async def operaton_session(
-    authorization: Optional[str] = settings.ENGINE_REST_AUTHORIZATION,
+    authorization: Optional[str] = None,
     headers: Optional[Dict[str, Optional[str]]] = None,
 ) -> AsyncGenerator[aiohttp.ClientSession, None]:
     """Get aiohttp session with Operaton headers."""
+    # Note: Authorization is intentionally NOT set at the session level.
+    # request_with_auth_retry sets it per-request, which avoids duplicate
+    # Authorization headers that aiohttp would produce via CIMultiDict.add()
+    # when the same key exists in both session and per-request headers.
     headers_: Dict[str, str] = {
         key: value
         for key, value in (
-            (
-                {
-                    "Content-Type": "application/json",
-                    "Accept": "application/json",
-                    "Authorization": authorization,
-                }
-                if authorization
-                else {"Content-Type": "application/json", "Accept": "application/json"}
-            )
+            {"Content-Type": "application/json", "Accept": "application/json"}
             | (headers or {})
         ).items()
         if value
@@ -41,6 +51,42 @@ async def operaton_session(
         timeout=aiohttp.ClientTimeout(total=settings.ENGINE_REST_TIMEOUT_SECONDS),
     ) as session:
         yield session
+
+
+async def request_with_auth_retry(
+    http: aiohttp.ClientSession,
+    method: str,
+    url: str,
+    authorization: Optional[str] = None,
+    **kwargs: Any,
+) -> ClientResponse:
+    """Execute request and retry once on 401 when using OAuth2."""
+    request_kwargs: Dict[str, Any] = dict(kwargs)
+    request_headers = dict(request_kwargs.pop("headers", {}) or {})
+    response: Optional[ClientResponse] = None
+
+    for attempt in range(2):  # pragma: no branch
+        auth_header = await resolve_authorization_header(authorization)
+        headers = dict(request_headers)
+        if auth_header and "Authorization" not in headers:
+            headers["Authorization"] = auth_header
+
+        response = await http.request(method, url, headers=headers, **request_kwargs)
+
+        if (
+            response.status != 401
+            or attempt == 1
+            or authorization is not None
+            or "Authorization" in request_headers
+            or not token_manager.is_configured
+        ):
+            break
+
+        await response.read()
+        token_manager.invalidate()
+
+    assert response is not None
+    return response
 
 
 # https://www.desmos.com/calculator/n8c16ahnrx
@@ -76,3 +122,13 @@ def canonical_url(url: str) -> str:
     parts = [x for x in urlparse(url)]
     parts[2] = re.sub("/+", "/", parts[2])
     return f"{urlunparse(parts)}"
+
+
+__all__ = [
+    "aiohttp",
+    "resolve_authorization_header",
+    "operaton_session",
+    "request_with_auth_retry",
+    "token_manager",
+    "canonical_url",
+]

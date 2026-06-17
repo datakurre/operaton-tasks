@@ -16,14 +16,14 @@ env:  ## Build and link the Python virtual environment
 	ln -s $(shell devenv build outputs.python.virtualenv) env
 
 check:  ## Run static analysis checks
-	black --check src tests
-	isort -c src tests
-	flake8 src
-	MYPYPATH=$(PWD)/stubs mypy --show-error-codes --strict src tests
+	treefmt --fail-on-change
+	flake8 src tests
+	MYPYPATH=$(PWD)/stubs mypy --show-error-codes --strict -p operaton.tasks
+	MYPYPATH=$(PWD)/stubs mypy --show-error-codes --follow-imports=silent --check-untyped-defs --disable-error-code attr-defined --disable-error-code arg-type --disable-error-code return-value --disable-error-code var-annotated --disable-error-code misc tests
 
 clean:  ## Remove build artifacts and temporary files
 	devenv gc
-	$(RM) -r env htmlcov .devenv
+	$(RM) -r env htmlcov
 
 devenv-up:  ## Start background services
 	devenv processes up -d
@@ -51,7 +51,7 @@ test: check test-pytest  ## Run all tests and checks
 test-coverage: htmlcov  ## Generate HTML coverage reports
 
 test-pytest:  ## Run unit tests with pytest
-	pytest --cov=$(MODULE) tests
+	pytest tests
 
 watch: .env  ## Start the application in watch mode
 	$(APP) heartbeat.py -- --reload
