@@ -1,19 +1,49 @@
-from aiohttp import ClientHandlerType, ClientRequest, ClientResponse
-from multidict import CIMultiDict
+from aiohttp import ClientHandlerType
+from aiohttp import ClientRequest
+from aiohttp import ClientResponse
+from aiohttp.abc import AbstractStreamWriter
+from aiohttp.payload import BytesPayload
 from contextlib import asynccontextmanager
 from fastapi.exceptions import HTTPException
+from multidict import CIMultiDict
 from operaton.tasks.config import settings
 from operaton.tasks.oauth2 import token_manager
-from typing import Any, Awaitable, Callable
+from typing import Any
 from typing import AsyncGenerator
+from typing import Awaitable
+from typing import Callable
 from typing import Dict
 from typing import Optional
 from typing import Tuple
+from typing import cast
 from urllib.parse import urlparse
 from urllib.parse import urlunparse
 import aiohttp
 import math
 import re
+
+
+class _RequestBodyBuffer:
+    def __init__(self) -> None:
+        self.body = bytearray()
+
+    async def write(self, chunk: bytes) -> None:
+        self.body.extend(chunk)
+
+
+async def _buffer_request_body(req: ClientRequest) -> None:
+    body = req.body
+    if body is None:
+        return
+    if isinstance(body, bytes):
+        req.body = BytesPayload(body)
+        return
+
+    # Streaming payloads are consumed by the first request, so retain their
+    # bytes before a 401 retry needs to send the body again.
+    buffer = _RequestBodyBuffer()
+    await body.write(cast(AbstractStreamWriter, buffer))
+    req.body = BytesPayload(bytes(buffer.body))
 
 
 async def resolve_authorization_header(
@@ -34,6 +64,15 @@ async def token_refresh_middleware(
 
     request_headers = req.headers or CIMultiDict[str]()
     response: Optional[ClientResponse] = None
+    can_retry = (
+        authorization is None
+        and "Authorization" not in request_headers
+        and token_manager.is_configured
+    )
+    if can_retry:
+        # Only OAuth-managed requests retry; explicit credentials retain the
+        # original one-shot body and existing no-retry behavior.
+        await _buffer_request_body(req)
 
     for attempt in range(2):  # pragma: no branch
         auth_header = await resolve_authorization_header(authorization)
@@ -102,7 +141,8 @@ async def request_with_auth_retry(
     request_kwargs: Dict[str, Any] = dict(kwargs)
     request_headers = dict(request_kwargs.pop("headers", {}) or {})
 
-    middlewares = request_kwargs.pop("middlewares", [])
+    # Keep caller-owned middleware sequences unchanged across repeated calls.
+    middlewares = list(request_kwargs.pop("middlewares", ()))
     middlewares.append(token_refresh_middleware_with_auth(authorization))
     response: ClientResponse = await http.request(
         method, url, headers=request_headers, middlewares=middlewares, **request_kwargs

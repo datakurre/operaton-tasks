@@ -5,17 +5,19 @@ from operaton.tasks.utils import operaton_session
 from operaton.tasks.utils import request_with_auth_retry
 from operaton.tasks.utils import resolve_authorization_header
 from operaton.tasks.utils import verify_response_status
+from starlette.exceptions import HTTPException
+from tests.fake_server import FakeRequestResponse
 from tests.fake_server import FakeServer
 from tests.fake_server import with_read_tracking
-from starlette.exceptions import HTTPException
+from types import SimpleNamespace
 from typing import Any
 from typing import Dict
 from typing import List
 from typing import Optional
+from typing import cast
 import asyncio
 import operaton.tasks.utils as utils_module
 import pytest
-from tests.fake_server import FakeRequestResponse
 
 
 class FakeClientSessionFactory:
@@ -147,6 +149,93 @@ async def test_request_with_auth_retry_does_not_retry_with_explicit_authorizatio
     assert response.status == 401
     assert len(server.calls) == 1
     assert server.calls[0].headers["Authorization"] == "Bearer explicit"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("middlewares", "expected"),
+    [
+        ([], []),
+        ((), ()),
+    ],
+)
+async def test_request_with_auth_retry_does_not_mutate_middlewares(
+    monkeypatch: Any,
+    middlewares: Any,
+    expected: Any,
+) -> None:
+    monkeypatch.setattr(
+        utils_module,
+        "token_manager",
+        FakeTokenManager(configured=False),
+    )
+    session = FakeRequestSession([200, 200])
+
+    response = await request_with_auth_retry(
+        session,  # type: ignore[arg-type]
+        "GET",
+        "/endpoint",
+        middlewares=middlewares,
+    )
+    await request_with_auth_retry(
+        session,  # type: ignore[arg-type]
+        "GET",
+        "/endpoint",
+        middlewares=middlewares,
+    )
+
+    assert response.status == 200
+    assert middlewares == expected
+    assert len(session.calls[0]["kwargs"]["middlewares"]) == 1
+    assert len(session.calls[1]["kwargs"]["middlewares"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_request_with_auth_retry_reuses_buffered_generator_body(
+    monkeypatch: Any,
+    aiohttp_client: Any,
+) -> None:
+    fake_token_manager = FakeTokenManager(
+        configured=True,
+        tokens=["token-1", "token-2"],
+    )
+    monkeypatch.setattr(utils_module, "token_manager", fake_token_manager)
+    server = FakeServer(statuses=[401, 200])
+    session = await aiohttp_client(server.app)
+
+    async def body() -> Any:
+        yield b"request body"
+
+    response = await request_with_auth_retry(
+        session,  # type: ignore[arg-type]
+        "POST",
+        "/endpoint",
+        data=body(),
+    )
+
+    assert response.status == 200
+    assert server.bodies == [
+        b"request body",
+        b"request body",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_buffer_request_body_reuses_bytes_body() -> None:
+    request = SimpleNamespace(body=b"request body")
+
+    await utils_module._buffer_request_body(cast(Any, request))
+
+    assert request.body._value == b"request body"
+
+
+@pytest.mark.asyncio
+async def test_buffer_request_body_ignores_missing_body() -> None:
+    request = SimpleNamespace(body=None)
+
+    await utils_module._buffer_request_body(cast(Any, request))
+
+    assert request.body is None
 
 
 @pytest.mark.asyncio

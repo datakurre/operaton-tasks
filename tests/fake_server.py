@@ -77,9 +77,11 @@ class FakeServer:
         self.app = web.Application()
         self.app.router.add_route("*", "/{tail:.*}", self.handle_request)
         self.responses: List[web.Response] = []
+        self.bodies: List[bytes] = []
 
     async def handle_request(self, request: web.Request) -> web.Response:
         self.calls.append(request)
+        self.bodies.append(await request.read())
         status = self._statuses.pop(0)
         response = web.Response(status=status)
         self.responses.append(response)
