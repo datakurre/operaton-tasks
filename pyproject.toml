@@ -1,6 +1,6 @@
 [project]
 name = "operaton-tasks"
-version = "1.0b3.dev0"
+version = "1.0b2"
 description = "External task library and client for Operaton"
 readme = "README.md"
 authors = [
@@ -26,7 +26,7 @@ dependencies =[
 operaton-tasks = "operaton.tasks.main:main"
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling<1.32"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]

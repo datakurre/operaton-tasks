@@ -1,13 +1,8 @@
-## 1.0b3 (unreleased)
+## 1.0b2 (2026-08-26)
 
 
-- Nothing changed yet.
-
-
-## 1.0b2 (unreleased)
-
-
-- Nothing changed yet.
-
+- Change request auth retry to use aiohttp middleware for easier integration
+  with existing codebase
+  [PeljattyMiksu]
 
 ## 1.0b1 (2026-06-17)
