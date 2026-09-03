@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0b4 (unreleased)
+
+
+- Nothing changed yet.
+
+
 ## 1.0b3 (2026-09-03)
 
 - Fix OAuth2TokenManager to respect configured timeout
