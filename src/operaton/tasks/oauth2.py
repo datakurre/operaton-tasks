@@ -62,7 +62,11 @@ class OAuth2TokenManager:
         if settings.OAUTH2_SCOPES:
             data["scope"] = settings.OAUTH2_SCOPES
 
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(
+                total=settings.ENGINE_REST_TIMEOUT_SECONDS
+            )
+        ) as session:
             async with session.post(token_url, data=data) as response:
                 if response.status != 200:
                     body = await response.text()

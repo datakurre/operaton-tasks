@@ -131,7 +131,7 @@ def test_oauth2_token_manager_caches_token(monkeypatch: Any) -> None:
         monkeypatch.setattr(
             oauth2_module.aiohttp,
             "ClientSession",
-            lambda: FakeOAuth2ClientSession(responses, calls),
+            lambda **kwargs: FakeOAuth2ClientSession(responses, calls),
         )
 
         now = [1000.0]
@@ -169,7 +169,7 @@ def test_oauth2_token_manager_refreshes_when_near_expiry(monkeypatch: Any) -> No
         monkeypatch.setattr(
             oauth2_module.aiohttp,
             "ClientSession",
-            lambda: FakeOAuth2ClientSession(responses, calls),
+            lambda **kwargs: FakeOAuth2ClientSession(responses, calls),
         )
 
         now = [1000.0]
@@ -279,6 +279,65 @@ def test_oauth2_invalidate_resets_expiry() -> None:
     assert manager._expires_at == 0.0
 
 
+def test_oauth2_fetch_token_uses_engine_rest_timeout(monkeypatch: Any) -> None:
+    settings.ENGINE_REST_TIMEOUT_SECONDS = 12
+    settings.OAUTH2_CLIENT_ID = "client"
+    settings.OAUTH2_CLIENT_SECRET = "secret"
+    settings.OAUTH2_TOKEN_URL = "https://example.test/token"
+    calls: List[Dict[str, Any]] = []
+    session_kwargs: List[Dict[str, Any]] = []
+    responses = [FakeTokenResponse(200, {"access_token": "token"})]
+
+    def client_session_factory(**kwargs: Any) -> FakeOAuth2ClientSession:
+        session_kwargs.append(kwargs)
+        return FakeOAuth2ClientSession(responses, calls)
+
+    monkeypatch.setattr(
+        oauth2_module.aiohttp,
+        "ClientSession",
+        client_session_factory,
+    )
+
+    assert asyncio.run(OAuth2TokenManager().get_token()) == "token"
+    assert session_kwargs[0]["timeout"].total == 12
+
+
+@pytest.mark.asyncio
+async def test_request_with_auth_retry_uses_engine_rest_timeout_for_token(
+    monkeypatch: Any,
+    aiohttp_client: Any,
+) -> None:
+    settings.ENGINE_REST_TIMEOUT_SECONDS = 12
+    settings.OAUTH2_CLIENT_ID = "client"
+    settings.OAUTH2_CLIENT_SECRET = "secret"
+    settings.OAUTH2_TOKEN_URL = "https://example.test/token"
+    calls: List[Dict[str, Any]] = []
+    session_kwargs: List[Dict[str, Any]] = []
+    responses = [FakeTokenResponse(200, {"access_token": "token"})]
+
+    def client_session_factory(**kwargs: Any) -> FakeOAuth2ClientSession:
+        session_kwargs.append(kwargs)
+        return FakeOAuth2ClientSession(responses, calls)
+
+    server = FakeServer(statuses=[200])
+    session = await aiohttp_client(server.app)
+    monkeypatch.setattr(
+        oauth2_module.aiohttp,
+        "ClientSession",
+        client_session_factory,
+    )
+    monkeypatch.setattr(utils_module, "token_manager", OAuth2TokenManager())
+
+    response = await request_with_auth_retry(
+        session,  # type: ignore[arg-type]
+        "GET",
+        "/endpoint",
+    )
+
+    assert response.status == 200
+    assert session_kwargs[0]["timeout"].total == 12
+
+
 def test_oauth2_fetch_token_raises_for_incomplete_settings() -> None:
     original_client_id = settings.OAUTH2_CLIENT_ID
     original_client_secret = settings.OAUTH2_CLIENT_SECRET
@@ -310,7 +369,7 @@ def test_oauth2_fetch_token_raises_on_non_200(monkeypatch: Any) -> None:
         monkeypatch.setattr(
             oauth2_module.aiohttp,
             "ClientSession",
-            lambda: FakeOAuth2ClientSession(responses, calls),
+            lambda **kwargs: FakeOAuth2ClientSession(responses, calls),
         )
 
         with pytest.raises(RuntimeError, match=r"failed \(400\)"):
@@ -335,7 +394,7 @@ def test_oauth2_fetch_token_raises_without_access_token(monkeypatch: Any) -> Non
         monkeypatch.setattr(
             oauth2_module.aiohttp,
             "ClientSession",
-            lambda: FakeOAuth2ClientSession(responses, calls),
+            lambda **kwargs: FakeOAuth2ClientSession(responses, calls),
         )
 
         with pytest.raises(RuntimeError, match="did not contain access_token"):
@@ -365,7 +424,7 @@ def test_oauth2_fetch_token_raises_on_invalid_expires_in(monkeypatch: Any) -> No
         monkeypatch.setattr(
             oauth2_module.aiohttp,
             "ClientSession",
-            lambda: FakeOAuth2ClientSession(responses, calls),
+            lambda **kwargs: FakeOAuth2ClientSession(responses, calls),
         )
 
         with pytest.raises(RuntimeError, match="invalid expires_in"):

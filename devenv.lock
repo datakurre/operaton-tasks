@@ -24,16 +24,15 @@
         "nixpkgs": "nixpkgs_2"
       },
       "locked": {
-        "lastModified": 1781559073,
-        "narHash": "sha256-nvKr2apMSeQPVAGOYdyOt62LQ3rqCtXMvZ8s+6z+WjE=",
+        "lastModified": 1788353093,
+        "narHash": "sha256-w2aEOTqj9AC3BaDFZIjhi5dkj1QLYdq3pLJtivYBz5E=",
         "owner": "vasara-bpm",
         "repo": "devenv-module-operaton",
-        "rev": "091484449e2a65017e30fda5942a87ba06a06a41",
+        "rev": "c8aa383ed8756ad4b9605409e2cf2056cc56a3c9",
         "type": "gitlab"
       },
       "original": {
         "owner": "vasara-bpm",
-        "ref": "oauth2",
         "repo": "devenv-module-operaton",
         "type": "gitlab"
       }
