@@ -9,8 +9,8 @@ export PYTHONPATH=$(PWD)/src
 MODULE := operaton.tasks
 APP := operaton-tasks
 
-build:  ## Build application
-	devenv build outputs.python.app
+build:  ## Build Python package distributions
+	uv build --out-dir result
 
 check:  ## Run static analysis checks
 	treefmt --fail-on-change

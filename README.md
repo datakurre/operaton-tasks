@@ -276,7 +276,7 @@ This project includes GitHub Actions and GitLab CI pipelines configured with `de
 
 **GitHub Actions** (`.github/workflows/`):
 - `ci.yml`: Runs on push, pull requests, and manual dispatch. Executes linting, type checking, and integration tests.
-- `release.yml`: Publishes to PyPI on version tags (v*).
+- `release.yml`: Publishes to PyPI on version tags (for example, `1.0b3`).
 
 **GitLab CI** (`.gitlab-ci.yml`):
 - Lint stage: treefmt, flake8, mypy

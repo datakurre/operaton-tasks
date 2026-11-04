@@ -3,7 +3,7 @@ name: Release to PyPI
 on:
   push:
     tags:
-      - "v*"
+      - "*"
   workflow_dispatch:
 
 jobs:
@@ -87,3 +87,25 @@ jobs:
         with:
           name: dist
           path: result/
+
+  publish:
+    name: Publish to PyPI
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/operaton-tasks
+    permissions:
+      id-token: write
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v7
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish package to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/

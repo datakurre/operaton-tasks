@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.0b4 (unreleased)
+## 1.0b4 (2026-11-04)
 
 - Update external task types for Camunda 7.24
   [datakurre]
