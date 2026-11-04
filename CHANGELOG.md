@@ -2,9 +2,8 @@
 
 ## 1.0b4 (unreleased)
 
-
-- Nothing changed yet.
-
+- Update external task types for Camunda 7.24
+  [datakurre]
 
 ## 1.0b3 (2026-09-03)
 
