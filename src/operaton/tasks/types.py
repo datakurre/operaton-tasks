@@ -411,7 +411,7 @@ class CaseDefinitionDto(BaseModel):
     tenantId: Optional[str] = Field(
         default=None, description="The tenant id of the case definition."
     )
-    historyTimeToLive: Optional[Annotated[int, Field(strict=True, gt=0)]] = Field(
+    historyTimeToLive: Optional[Annotated[int, Field(ge=0)]] = Field(
         default=None,
         description="History time to live value of the case definition.\nIs used within History cleanup.",
     )
@@ -597,7 +597,7 @@ class DecisionDefinitionDto(BaseModel):
         default=None,
         description="The key of the decision requirements definition this decision definition belongs to.",
     )
-    historyTimeToLive: Optional[Annotated[int, Field(strict=True, gt=0)]] = Field(
+    historyTimeToLive: Optional[Annotated[int, Field(ge=0)]] = Field(
         default=None,
         description="History time to live value of the decision definition.\nIs used within History cleanup.",
     )
@@ -967,6 +967,9 @@ class ExternalTaskDto(BaseModel):
         default=None,
         description="The business key of the process instance the external task belongs to.",
     )
+    createTime: Optional[AwareDatetime] = Field(
+        default=None, description="The date that the task was created."
+    )
 
 
 class SortBy2(Enum):
@@ -1114,6 +1117,65 @@ class ExternalTaskQueryDto(BaseModel):
         description=(
             "Only include jobs with a priority lower than or equal to the given"
             " value.\nValue must be a valid `long` value."
+        ),
+    )
+    processDefinitionKey: Optional[str] = Field(
+        default=None,
+        description="Restrict to tasks that belong to a process definition with the given key.",
+    )
+    processDefinitionKeyIn: Optional[List[str]] = Field(
+        default=None,
+        description=(
+            (
+                "Restrict to tasks that belong to a process definition with one of the given keys. The\n"
+                "keys need to be in a comma-separated list."
+            )
+        ),
+    )
+    processDefinitionName: Optional[str] = Field(
+        default=None,
+        description="Restrict to tasks that belong to a process definition with the given name.",
+    )
+    processDefinitionNameLike: Optional[str] = Field(
+        default=None,
+        description=(
+            (
+                "Restrict to tasks that have a process definition name that has the parameter value as\na "
+                "substring."
+            )
+        ),
+    )
+    variableNamesIgnoreCase: Optional[bool] = Field(
+        default=False,
+        description=(
+            (
+                "Match all variable names in this query case-insensitively. If set\n`variableName` and "
+                "`variablename` are treated as equal."
+            )
+        ),
+    )
+    variableValuesIgnoreCase: Optional[bool] = Field(
+        default=False,
+        description=(
+            (
+                "Match all variable values in this query case-insensitively. If set\n`variableValue` and "
+                "`variablevalue` are treated as equal."
+            )
+        ),
+    )
+    processVariables: Optional[List[VariableQueryParameterDto]] = Field(
+        default=None,
+        description=(
+            (
+                "A JSON array to only include tasks that belong to a process instance with variables\nwith "
+                "certain values. The array consists of JSON objects with three properties\n`name`, "
+                "`operator` and `value`. `name` is the variable name, `operator` is the\ncomparison "
+                "operator to be used and `value` the variable value. `value` may be of\ntype `String`, "
+                "`Number` or `Boolean`.\n\nValid `operator` values are:\n`eq` - equal to;\n`neq` - not equal "
+                "to;\n`gt` - greater than;\n`gteq` - greater than or equal to;\n`lt` - lower than;\n`lteq` - "
+                "lower than or equal to;\n`like`;\n`notLike`.\n`key` and `value` may not contain underscore "
+                "or comma characters."
+            )
         ),
     )
     sorting: Optional[List[SortingItem2]] = Field(
@@ -3368,6 +3430,7 @@ class HistoricTaskInstanceDto(BaseModel):
             "The process instance id of the root process instance that initiated the process\ncontaining this task."
         ),
     )
+    taskState: Optional[str] = Field(default=None, description="The task's state.")
 
 
 class SortBy11(Enum):
@@ -3686,7 +3749,7 @@ class HistoryCleanupConfigurationDto(BaseModel):
 
 
 class HistoryTimeToLiveDto(BaseModel):
-    historyTimeToLive: Optional[Annotated[int, Field(strict=True, gt=0)]] = Field(
+    historyTimeToLive: Optional[Annotated[int, Field(ge=0)]] = Field(
         default=None,
         description=(
             "New value for historyTimeToLive field of the definition.\nCan"
@@ -4277,6 +4340,17 @@ class JobQueryDto(BaseModel):
             " default behavior."
         ),
     )
+    acquired: Optional[bool] = Field(
+        default=None,
+        description=(
+            (
+                "Only select jobs which are acquired, i.e.,  lock expiration date is not null, lock "
+                "expiration\ndate is in future. Value may only be `true`, as `false` is the default\n"
+                "behavior. This does not take account if the job is suspended. This filter can be used "
+                "with the\nsuspension filter."
+            )
+        ),
+    )
     sorting: Optional[List[SortingItem14]] = Field(
         default=None,
         description=(
@@ -4617,7 +4691,7 @@ class ProcessDefinitionDto(BaseModel):
     versionTag: Optional[str] = Field(
         default=None, description="The version tag of the process definition."
     )
-    historyTimeToLive: Optional[Annotated[int, Field(strict=True, gt=0)]] = Field(
+    historyTimeToLive: Optional[Annotated[int, Field(ge=0)]] = Field(
         default=None,
         description="History time to live value of the process definition.\nIs used within History cleanup.",
     )
@@ -4723,6 +4797,10 @@ class ProcessInstanceDto(LinkableDto):
     definitionId: Optional[str] = Field(
         default=None,
         description="The id of the process definition that this process instance belongs to.",
+    )
+    definitionKey: Optional[str] = Field(
+        default=None,
+        description="The key of the process definition that this process instance belongs to.",
     )
     businessKey: Optional[str] = Field(
         default=None, description="The business key of the process instance."
@@ -5039,6 +5117,7 @@ class TaskDto(BaseModel):
     tenantId: Optional[str] = Field(
         default=None, description="If not `null`, the tenant id of the task."
     )
+    taskState: Optional[str] = Field(default=None, description="The task's state.")
 
 
 class SortBy17(Enum):
@@ -5082,7 +5161,13 @@ class SortingItem17(BaseModel):
     parameters: Optional[SortTaskQueryParametersDto] = None
 
 
-class TaskWithAttachmentAndCommentDto(TaskDto):
+class TaskWithVariablesDto(TaskDto):
+    variables: Optional[Dict[str, VariableValueDto]] = Field(
+        default=None, description="Holds the appropriate variables for the task."
+    )
+
+
+class TaskWithAttachmentAndCommentDto(TaskWithVariablesDto):
     attachment: Optional[bool] = Field(
         default=None,
         description="Specifies if an attachment exists for the task.",
@@ -6148,6 +6233,10 @@ class HistoricProcessInstanceQueryDto(BaseModel):
         default=None,
         description="Filter by process instance ids. Must be a JSON array of `Strings`.",
     )
+    processInstanceIdNotIn: Optional[List[str]] = Field(
+        default=None,
+        description="Exclude instances by process instance ids. Must be a JSON array of `Strings`.",
+    )
     processDefinitionId: Optional[str] = Field(
         default=None,
         description="Filter by the process definition the instances run on.",
@@ -6194,6 +6283,9 @@ class HistoricProcessInstanceQueryDto(BaseModel):
         default=None,
         description="Restrict the query to all process instances that are top level process instances.",
     )
+    rootProcessInstanceId: Optional[str] = Field(
+        default=None, description="Filter by root process instance id."
+    )
     finished: Optional[bool] = Field(
         default=None,
         description=(
@@ -6206,6 +6298,16 @@ class HistoricProcessInstanceQueryDto(BaseModel):
         default=None,
         description=(
             "Only include unfinished process instances. Value may only be `true`, as `false` is the default behavior."
+        ),
+    )
+    withJobsRetrying: Optional[bool] = Field(
+        default=None,
+        description=(
+            (
+                "Only include process instances which are associated with jobs that have encountered "
+                "exceptions and still\nhave retries left. Value may only be `true`, as `false` is the "
+                "default behavior."
+            )
         ),
     )
     withIncidents: Optional[bool] = Field(
@@ -7092,6 +7194,18 @@ class LockedExternalTaskDto(BaseModel):
             " properties:"
         ),
     )
+    extensionProperties: Optional[Dict[str, str]] = Field(
+        default=None,
+        description=(
+            (
+                "A JSON object containing a property for each extension property. The key is the property "
+                "name,\nthe value is the property value"
+            )
+        ),
+    )
+    createTime: Optional[AwareDatetime] = Field(
+        default=None, description="The date that the task was created."
+    )
 
 
 class MessageCorrelationResultWithVariableDto(BaseModel):
@@ -7921,6 +8035,15 @@ class TaskQueryDto(BaseModel):
     taskDefinitionKeyIn: Optional[List[str]] = Field(
         default=None,
         description="Restrict to tasks that have one of the given keys. The keys need to be in a comma-separated list.",
+    )
+    taskDefinitionKeyNotIn: Optional[List[str]] = Field(
+        default=None,
+        description=(
+            (
+                "Exclude instances by a list of task definition keys. The keys need to be in a "
+                "comma-separated list."
+            )
+        ),
     )
     taskDefinitionKeyLike: Optional[str] = Field(
         default=None,
@@ -8898,6 +9021,8 @@ HistoricProcessInstanceQueryDto.model_rebuild()
 HistoricTaskInstanceQueryDto.model_rebuild()
 ProcessInstanceQueryDto.model_rebuild()
 TaskQueryDto.model_rebuild()
+TaskWithVariablesDto.model_rebuild()
+TaskWithAttachmentAndCommentDto.model_rebuild()
 
 ###
 # Added manually
